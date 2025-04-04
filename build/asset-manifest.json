@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/thesis-gantt-chart/static/css/main.3d7f22f9.css",
-    "main.js": "/thesis-gantt-chart/static/js/main.53082d3c.js",
+    "main.css": "/thesis-gantt-chart/static/css/main.d8edeb8a.css",
+    "main.js": "/thesis-gantt-chart/static/js/main.84c332c0.js",
     "index.html": "/thesis-gantt-chart/index.html",
-    "main.3d7f22f9.css.map": "/thesis-gantt-chart/static/css/main.3d7f22f9.css.map",
-    "main.53082d3c.js.map": "/thesis-gantt-chart/static/js/main.53082d3c.js.map"
+    "main.d8edeb8a.css.map": "/thesis-gantt-chart/static/css/main.d8edeb8a.css.map",
+    "main.84c332c0.js.map": "/thesis-gantt-chart/static/js/main.84c332c0.js.map"
   },
   "entrypoints": [
-    "static/css/main.3d7f22f9.css",
-    "static/js/main.53082d3c.js"
+    "static/css/main.d8edeb8a.css",
+    "static/js/main.84c332c0.js"
   ]
 }
