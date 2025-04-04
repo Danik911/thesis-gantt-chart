@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ThesisGanttChart = () => {
   // State for the tooltip/hover details and position
   const [hoveredGateway, setHoveredGateway] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  
+  // State for tracking completed days
+  const [completedDays, setCompletedDays] = useState({});
+  
+  // State for instruction modal
+  const [showInstructions, setShowInstructions] = useState(false);
   
   // Project timeframe: June 1 - September 1, 2024
   // Calculate weeks in the project (June, July, August)
@@ -273,18 +279,133 @@ const ThesisGanttChart = () => {
 
   // Owner information
   const owners = {
-    "ME": "You (Thesis Author)",
+    "ME": "Daniil Vladimirov (Thesis Author)",
     "SV": "Supervisor",
     "SME": "Subject Matter Expert"
   };
 
+  // Load completed days from localStorage on initial render
+  useEffect(() => {
+    const savedCompletedDays = localStorage.getItem('thesisGanttCompletedDays');
+    if (savedCompletedDays) {
+      setCompletedDays(JSON.parse(savedCompletedDays));
+    }
+    
+    // Check if this is the first visit
+    const hasVisitedBefore = localStorage.getItem('thesisGanttVisited');
+    if (!hasVisitedBefore) {
+      setShowInstructions(true);
+      localStorage.setItem('thesisGanttVisited', 'true');
+    }
+  }, []);
+
+  // Save completed days to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('thesisGanttCompletedDays', JSON.stringify(completedDays));
+  }, [completedDays]);
+
+  // Function to toggle completion status of a day
+  const toggleDayCompletion = (activityId, weekIndex, dayIndex) => {
+    const dayKey = `${activityId}-${weekIndex}-${dayIndex}`;
+    
+    setCompletedDays(prevState => {
+      const newState = { ...prevState };
+      
+      // Toggle completed status
+      if (newState[dayKey]) {
+        delete newState[dayKey];
+      } else {
+        newState[dayKey] = true;
+      }
+      
+      return newState;
+    });
+  };
+
+  // Calculate progress for an activity
+  const calculateActivityProgress = (activity) => {
+    let totalDays = 0;
+    let completedDaysCount = 0;
+    
+    // First, identify all days that are part of this activity
+    const activityDays = [];
+    
+    // For each week in the activity's span
+    for (let w = 0; w < activity.weeks.length; w++) {
+      const weekIndex = activity.weeks[w];
+      
+      // Determine the start and end days for this week
+      let startDay, endDay;
+      
+      if (w === 0) {
+        // If this is the first week, start from the specified first day
+        startDay = activity.days[0];
+      } else {
+        // Otherwise start from the beginning of the week
+        startDay = 0;
+      }
+      
+      if (w === activity.weeks.length - 1) {
+        // If this is the last week, end at the specified last day
+        endDay = activity.days[activity.days.length - 1];
+      } else {
+        // Otherwise end at the end of the week
+        endDay = 6;
+      }
+      
+      // Add each day in this week to our activity days
+      for (let dayIndex = startDay; dayIndex <= endDay; dayIndex++) {
+        // Skip non-existent days in the last week
+        if (weekIndex === 13 && dayIndex > 1) continue;
+        
+        activityDays.push({
+          weekIndex,
+          dayIndex
+        });
+      }
+    }
+    
+    // Now count the total days and completed days
+    totalDays = activityDays.length;
+    
+    // Check each day to see if it's completed
+    activityDays.forEach(({ weekIndex, dayIndex }) => {
+      const dayKey = `${activity.id}-${weekIndex}-${dayIndex}`;
+      if (completedDays[dayKey]) {
+        completedDaysCount++;
+      }
+    });
+    
+    return totalDays > 0 ? (completedDaysCount / totalDays) * 100 : 0;
+  };
+
+  // Helper function to determine if a day is part of an activity
+  const isDayInActivity = (activity, weekIndex, dayIndex) => {
+    if (!activity.weeks.includes(weekIndex)) return false;
+    
+    // First week of activity
+    if (weekIndex === activity.weeks[0]) {
+      return dayIndex >= activity.days[0];
+    }
+    // Last week of activity
+    else if (weekIndex === activity.weeks[activity.weeks.length - 1]) {
+      return dayIndex <= activity.days[activity.days.length - 1];
+    }
+    // Weeks in between
+    else {
+      return true;
+    }
+  };
+
   // Render a cell for a particular week and day
   const renderCell = (weekIndex, dayIndex, activity) => {
-    // Check if this activity spans this particular day in this particular week
-    const isActiveDay = activity.weeks.includes(weekIndex) && 
-                        ((weekIndex === activity.weeks[0] && dayIndex >= activity.days[0]) ||
-                         (weekIndex > activity.weeks[0] && weekIndex < activity.weeks[activity.weeks.length-1]) ||
-                         (weekIndex === activity.weeks[activity.weeks.length-1] && dayIndex <= activity.days[activity.days.length-1]));
+    // Skip non-existent days in the last week
+    if (weekIndex === 13 && dayIndex > 1) {
+      return <td key={`${weekIndex}-${dayIndex}-${activity.id}`} className="bg-white border border-gray-200 w-6 h-6"></td>;
+    }
+    
+    // Check if this day is part of the activity
+    const isActiveDay = isDayInActivity(activity, weekIndex, dayIndex);
     
     // Handle first or last day of an activity
     const isFirstDay = weekIndex === activity.weeks[0] && dayIndex === activity.days[0];
@@ -293,10 +414,21 @@ const ThesisGanttChart = () => {
     // Check if this is a gateway (last cell of a gateway activity)
     const isGatewayCell = activity.isGateway && isLastDay;
     
+    // Check if this day is completed
+    const dayKey = `${activity.id}-${weekIndex}-${dayIndex}`;
+    const isCompleted = completedDays[dayKey];
+    
     // Determine the cell color
-    let cellColor = isActiveDay ? activity.color : 'bg-white';
-    if (isGatewayCell) {
-      cellColor = 'bg-amber-500'; // Gateway color
+    let cellColor = 'bg-white';
+    
+    if (isActiveDay) {
+      if (isCompleted) {
+        cellColor = 'bg-gray-400'; // Completed tasks are gray
+      } else if (isGatewayCell) {
+        cellColor = 'bg-amber-500'; // Gateway color
+      } else {
+        cellColor = activity.color; // Normal activity color
+      }
     }
     
     // Handler functions for mouse events
@@ -317,25 +449,136 @@ const ThesisGanttChart = () => {
       }
     };
     
+    // Click handler for toggling completion
+    const handleClick = () => {
+      if (isActiveDay) {
+        toggleDayCompletion(activity.id, weekIndex, dayIndex);
+      }
+    };
+    
     return (
       <td 
         key={`${weekIndex}-${dayIndex}-${activity.id}`} 
         className={`border border-gray-200 w-6 h-6 
           ${cellColor} 
           ${isFirstDay ? 'rounded-l' : ''} 
-          ${isLastDay ? 'rounded-r' : ''}`
+          ${isLastDay ? 'rounded-r' : ''}
+          ${isActiveDay ? 'cursor-pointer hover:opacity-80' : ''}`
         }
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-      ></td>
+        onClick={handleClick}
+      >
+        {isCompleted && (
+          <div className="flex items-center justify-center h-full">
+            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+        )}
+      </td>
+    );
+  };
+
+  // Instructions Modal Component
+  const InstructionsModal = () => {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-blue-800">Welcome to Thesis GANTT Chart</h2>
+            <button 
+              onClick={() => setShowInstructions(false)}
+              className="bg-gray-200 rounded-full p-2 hover:bg-gray-300"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div className="mb-4 border-b pb-3">
+            <p className="font-medium">Created by: <span className="text-blue-700">Daniil Vladimirov</span></p>
+            <p className="font-medium">Student Number: <span className="text-blue-700">3154227</span></p>
+          </div>
+          
+          <h3 className="text-lg font-semibold mb-2">How to Use This GANTT Chart:</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-medium text-blue-600">1. Tracking Task Progress</h4>
+              <p>Click on any colored cell to mark it as completed. The cell will turn gray with a checkmark. Click again to mark it as incomplete.</p>
+              <div className="flex mt-1 items-center">
+                <div className="w-6 h-6 bg-purple-400 mr-2"></div>
+                <span>→ Click →</span>
+                <div className="w-6 h-6 bg-gray-400 flex items-center justify-center ml-2">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-blue-600">2. Progress Tracking</h4>
+              <p>Each task has a progress bar showing completion percentage. As you mark days complete, the progress bar updates automatically.</p>
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-blue-600">3. Gateway Milestones</h4>
+              <p>Amber cells represent gateway milestones. Hover over them to see deliverables and next steps.</p>
+              <div className="bg-amber-500 w-12 h-6 rounded mt-1"></div>
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-blue-600">4. Automatic Saving</h4>
+              <p>Your progress is automatically saved in your browser's local storage. It will persist even if you close the browser and return later.</p>
+            </div>
+            
+            <div>
+              <h4 className="font-medium text-blue-600">5. Thesis Timeline</h4>
+              <p>This GANTT chart covers the 3-month thesis timeframe from June 1 to September 1, 2024. All tasks include a 10% buffer time as requested.</p>
+            </div>
+          </div>
+          
+          <div className="mt-6 bg-blue-50 p-4 rounded">
+            <h4 className="font-semibold">Research Focus</h4>
+            <p>This chart is designed for tracking progress on the thesis topic: "Can AI agents facilitate the transition from computer system validation to computer software assurance?" as outlined in the assignment.</p>
+          </div>
+          
+          <button 
+            onClick={() => setShowInstructions(false)}
+            className="mt-6 bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-700 w-full font-medium"
+          >
+            Get Started
+          </button>
+        </div>
+      </div>
     );
   };
 
   return (
     <div className="p-2 bg-white rounded-lg shadow-lg overflow-x-auto relative">
-      <h1 className="text-2xl font-bold mb-4">AI-Enabled CSV to CSA Transition: Thesis GANTT Chart</h1>
-      <div className="mb-4">
+      {showInstructions && <InstructionsModal />}
+      
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">AI-Enabled CSV to CSA Transition: Thesis GANTT Chart</h1>
+        <button 
+          onClick={() => setShowInstructions(true)} 
+          className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded flex items-center"
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Help
+        </button>
+      </div>
+      
+      <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Project Timeline: June 1 - September 1, 2024</h2>
+        <div className="text-sm text-gray-600">
+          <span className="font-medium">Daniil Vladimirov</span> | Student #3154227
+        </div>
       </div>
       
       <div className="mb-6">
@@ -389,11 +632,30 @@ const ThesisGanttChart = () => {
             <div className="w-4 h-4 mr-1 bg-amber-500"></div>
             <span>Gateway</span>
           </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 mr-1 bg-gray-400"></div>
+            <span>Completed</span>
+          </div>
         </div>
       </div>
       
       <div className="mb-4">
-        <h3 className="text-md font-semibold mb-2">Resources:</h3>
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-md font-semibold">Resources:</h3>
+          <button
+            onClick={() => {
+              if (window.confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
+                localStorage.removeItem('thesisGanttCompletedDays');
+                localStorage.removeItem('thesisGanttVisited');
+                alert("Progress has been reset. The page will now reload.");
+                window.location.reload();
+              }
+            }}
+            className="text-xs text-red-600 hover:text-red-800 border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+          >
+            Reset Progress
+          </button>
+        </div>
         <div className="flex flex-wrap gap-3 text-sm">
           {Object.entries(owners).map(([key, value]) => (
             <div key={key} className="flex items-center">
@@ -404,6 +666,16 @@ const ThesisGanttChart = () => {
             </div>
           ))}
         </div>
+      </div>
+      
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded flex items-center justify-between">
+        <p className="text-sm font-medium">Click on any colored cell to mark it as completed or incomplete. Your progress is automatically saved.</p>
+        <button 
+          onClick={() => setShowInstructions(true)}
+          className="text-blue-700 hover:text-blue-900 text-sm font-medium"
+        >
+          View full instructions
+        </button>
       </div>
       
       {/* Gateway Hover Tooltip */}
@@ -440,6 +712,7 @@ const ThesisGanttChart = () => {
                 </th>
               ))}
               <th className="border border-gray-300 bg-gray-100 p-2 w-16 text-center">Owner</th>
+              <th className="border border-gray-300 bg-gray-100 p-2 w-24 text-center">Progress</th>
             </tr>
             <tr>
               <th className="border border-gray-300 bg-gray-100"></th>
@@ -450,6 +723,7 @@ const ThesisGanttChart = () => {
                   </th>
                 ))
               ))}
+              <th className="border border-gray-300 bg-gray-100"></th>
               <th className="border border-gray-300 bg-gray-100"></th>
             </tr>
           </thead>
@@ -466,24 +740,38 @@ const ThesisGanttChart = () => {
                     ))
                   ))}
                   <td className="border border-gray-300 bg-gray-800 text-white"></td>
+                  <td className="border border-gray-300 bg-gray-800 text-white"></td>
                 </tr>
-                {task.activities.map((activity) => (
-                  <tr key={activity.id}>
-                    <td className="border border-gray-300 p-2 text-sm">
-                      {activity.name}
-                    </td>
-                    {weeks.map((week, weekIndex) => (
-                      week.days.map((day, dayIndex) => (
-                        renderCell(weekIndex, dayIndex, activity)
-                      ))
-                    ))}
-                    <td className="border border-gray-300 p-1 text-center">
-                      <div className="w-8 h-8 rounded-full bg-red-100 mx-auto flex items-center justify-center text-sm">
-                        {activity.owner}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {task.activities.map((activity) => {
+                  const progress = calculateActivityProgress(activity);
+                  
+                  return (
+                    <tr key={activity.id}>
+                      <td className="border border-gray-300 p-2 text-sm">
+                        {activity.name}
+                      </td>
+                      {weeks.map((week, weekIndex) => (
+                        week.days.map((day, dayIndex) => (
+                          renderCell(weekIndex, dayIndex, activity)
+                        ))
+                      ))}
+                      <td className="border border-gray-300 p-1 text-center">
+                        <div className="w-8 h-8 rounded-full bg-red-100 mx-auto flex items-center justify-center text-sm">
+                          {activity.owner}
+                        </div>
+                      </td>
+                      <td className="border border-gray-300 p-2">
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                          <div 
+                            className={`h-4 rounded-full ${progress > 0 ? 'bg-blue-600' : 'bg-gray-300'}`}
+                            style={{ width: `${progress > 0 ? progress : 0}%` }}
+                          ></div>
+                        </div>
+                        <div className="text-center text-xs mt-1 font-semibold">{Math.round(progress)}%</div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </React.Fragment>
             ))}
           </tbody>
@@ -491,7 +779,12 @@ const ThesisGanttChart = () => {
       </div>
       
       <div className="mt-6 p-3 bg-blue-50 rounded border border-blue-200 text-sm">
-        <h3 className="font-semibold mb-2">Key Notes:</h3>
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="font-semibold">Key Notes:</h3>
+          <div className="text-xs text-gray-500">
+            Created by Daniil Vladimirov (3154227) for AI-Enabled CSV to CSA Transition Thesis
+          </div>
+        </div>
         <ul className="list-disc pl-5 space-y-1">
           <li>Each task includes a 10% time buffer as requested</li>
           <li>Amber colored cells indicate gateways at the end of key tasks (hover to see details)</li>
@@ -501,6 +794,8 @@ const ThesisGanttChart = () => {
           <li>SME evaluation of generated reports scheduled in August</li>
           <li>Sequential dependencies are maintained in the task flow</li>
           <li>The chart visualizes which tasks can be done in parallel</li>
+          <li>Click any colored cell to mark it as completed (gray with checkmark)</li>
+          <li>Progress is automatically saved in your browser</li>
         </ul>
       </div>
     </div>
