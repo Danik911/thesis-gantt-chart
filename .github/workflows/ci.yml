@@ -58,7 +58,12 @@ jobs:
     - name: Build project
       run: npm run build
     
+    - name: Configure git
+      run: |
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Actions"
+    
     - name: Deploy to GitHub Pages
       run: npm run deploy
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
