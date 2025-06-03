@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const ThesisGanttChart = () => {
   // State for the tooltip/hover details and position
@@ -8,25 +8,188 @@ const ThesisGanttChart = () => {
   // State for tracking completed days
   const [completedDays, setCompletedDays] = useState({});
   
-  // Auto-save effect for tasks
+  // Auto-save states
+  const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error', 'unsaved'
+  const [lastSaveTime, setLastSaveTime] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+  const [autoSaveEnabled] = useState(true);
+  
+  // Debounce timer ref
+  const saveTimeoutRef = useRef(null);
+  const SAVE_DELAY = 2000; // 2 seconds delay for auto-save
+  
+  // Data compression utilities
+  const compressData = useCallback((data) => {
+    try {
+      // Simple compression: remove unnecessary whitespace and use shorter keys
+      const compressed = {
+        v: 1, // version
+        d: Date.now(), // timestamp
+        t: data.map(task => ({
+          i: task.id,
+          n: task.name,
+          a: task.activities.map(activity => ({
+            i: activity.id,
+            n: activity.name,
+            w: activity.weeks,
+            d: activity.days,
+            o: activity.owner,
+            c: activity.color,
+            g: activity.isGateway,
+            gi: activity.gatewayInfo
+          }))
+        }))
+      };
+      return JSON.stringify(compressed);
+    } catch (error) {
+      return JSON.stringify(data); // Fallback to uncompressed
+    }
+  }, []);
+  
+  const decompressData = useCallback((compressedString) => {
+    try {
+      const data = JSON.parse(compressedString);
+      
+      // Check if data is compressed (has version field)
+      if (data.v === 1 && data.t) {
+        return data.t.map(task => ({
+          id: task.i,
+          name: task.n,
+          activities: task.a.map(activity => ({
+            id: activity.i,
+            name: activity.n,
+            weeks: activity.w,
+            days: activity.d,
+            owner: activity.o,
+            color: activity.c,
+            isGateway: activity.g,
+            gatewayInfo: activity.gi
+          }))
+        }));
+      }
+      
+      // If not compressed, return as is
+      return data;
+    } catch (error) {
+      // If decompression fails, try parsing as regular JSON
+      return JSON.parse(compressedString);
+    }
+  }, []);
+  
+  // Enhanced save function with error handling and compression
+  const saveState = useCallback(async (taskData) => {
+    if (!autoSaveEnabled) return;
+    
+    setSaveStatus('saving');
+    setSaveError(null);
+    
+    try {
+      const compressed = compressData(taskData);
+      const storageKey = 'gantt-tasks';
+      const backupKey = 'gantt-tasks-backup';
+      
+      // Check storage limit
+      const testKey = 'storage-test';
+      try {
+        localStorage.setItem(testKey, compressed);
+        localStorage.removeItem(testKey);
+      } catch (storageError) {
+        throw new Error('Storage limit exceeded. Please clear some browser data.');
+      }
+      
+      // Create backup of current data before saving new
+      const currentData = localStorage.getItem(storageKey);
+      if (currentData) {
+        localStorage.setItem(backupKey, currentData);
+      }
+      
+      // Save new data
+      localStorage.setItem(storageKey, compressed);
+      localStorage.setItem('gantt-save-timestamp', Date.now().toString());
+      
+      setSaveStatus('saved');
+      setLastSaveTime(new Date());
+      
+    } catch (error) {
+      setSaveStatus('error');
+      setSaveError(error.message);
+      // In case of error, restore from backup if available
+      const backup = localStorage.getItem('gantt-tasks-backup');
+      if (backup) {
+        localStorage.setItem('gantt-tasks', backup);
+      }
+    }
+  }, [autoSaveEnabled, compressData]);
+  
+  // Debounced save function
+  const debouncedSave = useCallback((taskData) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    setSaveStatus('unsaved');
+    
+    saveTimeoutRef.current = setTimeout(() => {
+      saveState(taskData);
+    }, SAVE_DELAY);
+  }, [saveState]);
+  
+  // Manual save function
+  const manualSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveState(tasks);
+  }, [saveState, tasks]);
+  
+  // Recovery mechanism
+  const recoverUnsavedChanges = useCallback(() => {
+    try {
+      const backup = localStorage.getItem('gantt-tasks-backup');
+      if (backup) {
+        const recoveredTasks = decompressData(backup);
+        setTasks(recoveredTasks);
+        setSaveStatus('saved');
+        alert('Unsaved changes have been recovered from backup.');
+      }
+    } catch (error) {
+      alert('Failed to recover backup data.');
+    }
+  }, [decompressData]);
+  
+  // Load tasks on component mount
   useEffect(() => {
     const savedTasks = localStorage.getItem('gantt-tasks');
     if (savedTasks) {
       try {
-        setTasks(JSON.parse(savedTasks));
+        const decompressed = decompressData(savedTasks);
+        setTasks(decompressed);
+        setSaveStatus('saved');
+        
+        const saveTimestamp = localStorage.getItem('gantt-save-timestamp');
+        if (saveTimestamp) {
+          setLastSaveTime(new Date(parseInt(saveTimestamp)));
+        }
       } catch (error) {
-        console.error('Error loading saved tasks:', error);
+        setSaveError('Error loading saved tasks: ' + error.message);
+        // Check if backup is available
+        const backup = localStorage.getItem('gantt-tasks-backup');
+        if (backup) {
+          if (window.confirm('Failed to load main data. Would you like to recover from backup?')) {
+            recoverUnsavedChanges();
+          }
+        }
       }
     }
-  }, []);
+     }, [decompressData, recoverUnsavedChanges]);
   
-  // Auto-save tasks to localStorage
+  // Auto-save tasks when they change
   useEffect(() => {
     if (tasks.length > 0) {
-      localStorage.setItem('gantt-tasks', JSON.stringify(tasks));
+      debouncedSave(tasks);
     }
-  }, [tasks]);
-  
+  }, [tasks, debouncedSave]);
+
   // State for instruction modal
   const [showInstructions, setShowInstructions] = useState(false);
   
@@ -49,6 +212,12 @@ const ThesisGanttChart = () => {
   });
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverItem, setDragOverItem] = useState(null);
+
+  // State for enhanced deletion functionality
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteConfirmationData, setDeleteConfirmationData] = useState(null);
+  const [deletedItemsHistory, setDeletedItemsHistory] = useState([]);
+  const [showUndoNotification, setShowUndoNotification] = useState(false);
   
   // Refs for inputs
   const editInputRef = useRef(null);
@@ -315,6 +484,71 @@ const ThesisGanttChart = () => {
           owner: "ME",
           color: "bg-blue-300", 
           isGateway: false
+        }
+      ]
+    },
+    {
+      id: 5,
+      name: "PRIMARY DATA COLLECTION",
+      activities: [
+        { 
+          id: 5.1, 
+          name: "Create data collection plan for the prototype", 
+          weeks: [9], 
+          days: [1, 2, 3], 
+          owner: "ME",
+          color: "bg-orange-400",
+          isGateway: false
+        },
+        { 
+          id: 5.2, 
+          name: "Create data collection plan for interviews", 
+          weeks: [9], 
+          days: [4, 5, 6], 
+          owner: "ME",
+          color: "bg-orange-400",
+          isGateway: false
+        },
+        { 
+          id: 5.3, 
+          name: "Create questions for interviews", 
+          weeks: [9, 10], 
+          days: [0, 1, 2], 
+          owner: "ME",
+          color: "bg-orange-400",
+          isGateway: false
+        },
+        { 
+          id: 5.4, 
+          name: "Collect data from the prototype", 
+          weeks: [10, 11], 
+          days: [3, 4, 5, 6, 0, 1, 2], 
+          owner: "ME",
+          color: "bg-orange-500",
+          isGateway: false
+        },
+        { 
+          id: 5.5, 
+          name: "Collect data from the interviews", 
+          weeks: [11], 
+          days: [3, 4, 5, 6], 
+          owner: "ME",
+          color: "bg-orange-500",
+          isGateway: false
+        },
+        { 
+          id: 5.6, 
+          name: "Analyze primary data", 
+          weeks: [11, 12], 
+          days: [0, 1, 2, 3, 4], 
+          owner: "ME",
+          color: "bg-orange-600",
+          isGateway: true,
+          gatewayInfo: {
+            name: "Primary Data Analysis Complete",
+            deliverables: ["Prototype performance data", "Interview findings", "Data analysis results", "Key insights for thesis"],
+            nextSteps: "Incorporate findings into thesis conclusions"
+          }
         }
       ]
     }
@@ -619,27 +853,7 @@ const ThesisGanttChart = () => {
   }, [editingRow]);
 
   // Load tasks from localStorage on mount
-  useEffect(() => {
-    const savedTasks = localStorage.getItem('thesisGanttTasks');
-    if (savedTasks) {
-      try {
-        setTasks(JSON.parse(savedTasks));
-      } catch (error) {
-        console.error('Failed to load tasks from localStorage:', error);
-      }
-    }
-  }, []);
-
-  // Save tasks to localStorage whenever tasks change
-  useEffect(() => {
-    if (tasks.length > 0) {
-      try {
-        localStorage.setItem('thesisGanttTasks', JSON.stringify(tasks));
-      } catch (error) {
-        console.error('Failed to save tasks to localStorage:', error);
-      }
-    }
-  }, [tasks]);
+  // Note: Loading and saving are now handled by the enhanced auto-save system above
 
   // Generate unique task ID
   const generateUniqueTaskId = () => {
@@ -787,35 +1001,211 @@ const ThesisGanttChart = () => {
       setShowEditFeedback({ show: false, message: '', type: '' });
     }, 3000);
   };
-  
-  // Delete task
-  const deleteTask = (taskId) => {
-    if (window.confirm('Are you sure you want to delete this task and all its activities?')) {
-      setTasks(prevTasks => {
-        const newTasks = prevTasks.filter(task => task.id !== taskId);
-        showEditFeedbackMessage('Task deleted successfully!', 'success');
-        return newTasks;
+
+  // Dependency validation functions
+  const findDependentActivities = (taskId, activityId = null) => {
+    const dependents = [];
+    
+    tasks.forEach(task => {
+      task.activities.forEach(activity => {
+        // Skip the activity being deleted
+        if (activityId && activity.id === activityId && task.id === taskId) return;
+        
+        // Check if this activity depends on the task/activity being deleted
+        if (activityId) {
+          // Check for activity-level dependencies (temporal relationships)
+          const deletingActivity = tasks.find(t => t.id === taskId)?.activities.find(a => a.id === activityId);
+          if (deletingActivity && hasTimeDependency(deletingActivity, activity)) {
+            dependents.push({ task: task.name, activity: activity.name, type: 'temporal' });
+          }
+        } else {
+          // Check for task-level dependencies
+          if (task.id !== taskId && hasTaskDependency(taskId, task)) {
+            dependents.push({ task: task.name, activity: activity.name, type: 'task' });
+          }
+        }
       });
+    });
+    
+    return dependents;
+  };
+
+  const hasTimeDependency = (sourceActivity, targetActivity) => {
+    // Check if target activity starts after source activity ends (temporal dependency)
+    const sourceEndWeek = Math.max(...sourceActivity.weeks);
+    const targetStartWeek = Math.min(...targetActivity.weeks);
+    return targetStartWeek > sourceEndWeek;
+  };
+
+  const hasTaskDependency = (sourceTaskId, targetTask) => {
+    // Check if target task has activities that temporally depend on source task activities
+    const sourceTask = tasks.find(t => t.id === sourceTaskId);
+    if (!sourceTask) return false;
+    
+    const sourceEndWeek = Math.max(...sourceTask.activities.flatMap(a => a.weeks));
+    const targetStartWeek = Math.min(...targetTask.activities.flatMap(a => a.weeks));
+    
+    return targetStartWeek > sourceEndWeek;
+  };
+
+  const validateTimelineIntegrity = (taskId, activityId = null) => {
+    const issues = [];
+    
+    if (activityId) {
+      // Check if removing this activity creates gaps in task timeline
+      const task = tasks.find(t => t.id === taskId);
+      const remainingActivities = task.activities.filter(a => a.id !== activityId);
+      
+      if (remainingActivities.length > 0) {
+        const weeks = remainingActivities.flatMap(a => a.weeks).sort((a, b) => a - b);
+        for (let i = 1; i < weeks.length; i++) {
+          if (weeks[i] - weeks[i-1] > 1) {
+            issues.push(`Removing this activity may create timeline gaps in ${task.name}`);
+            break;
+          }
+        }
+      }
+    } else {
+      // Check if removing this task creates gaps in project timeline
+      const remainingTasks = tasks.filter(t => t.id !== taskId);
+      const allWeeks = remainingTasks.flatMap(t => t.activities.flatMap(a => a.weeks)).sort((a, b) => a - b);
+      
+      for (let i = 1; i < allWeeks.length; i++) {
+        if (allWeeks[i] - allWeeks[i-1] > 2) { // Allow some gaps between tasks
+          issues.push('Removing this task may create significant timeline gaps');
+          break;
+        }
+      }
     }
+    
+    return issues;
+  };
+
+  // Enhanced delete functions with dependency validation
+  const initiateDeleteTask = (taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    const dependents = findDependentActivities(taskId);
+    const timelineIssues = validateTimelineIntegrity(taskId);
+    
+    setDeleteConfirmationData({
+      type: 'task',
+      item: task,
+      dependents,
+      timelineIssues,
+      onConfirm: () => executeDeleteTask(taskId)
+    });
+    setShowDeleteConfirmation(true);
+  };
+
+  const initiateDeleteActivity = (taskId, activityId) => {
+    const task = tasks.find(t => t.id === taskId);
+    const activity = task?.activities.find(a => a.id === activityId);
+    if (!task || !activity) return;
+    
+    const dependents = findDependentActivities(taskId, activityId);
+    const timelineIssues = validateTimelineIntegrity(taskId, activityId);
+    
+    setDeleteConfirmationData({
+      type: 'activity',
+      item: activity,
+      parentTask: task,
+      dependents,
+      timelineIssues,
+      onConfirm: () => executeDeleteActivity(taskId, activityId)
+    });
+    setShowDeleteConfirmation(true);
+  };
+
+  const executeDeleteTask = (taskId) => {
+    const taskToDelete = tasks.find(t => t.id === taskId);
+    if (!taskToDelete) return;
+    
+    // Store for undo functionality
+    const undoData = {
+      type: 'task',
+      item: taskToDelete,
+      timestamp: Date.now(),
+      originalTasks: [...tasks]
+    };
+    
+    setTasks(prevTasks => {
+      const newTasks = prevTasks.filter(task => task.id !== taskId);
+      return newTasks;
+    });
+    
+    // Add to undo history
+    setDeletedItemsHistory(prev => [undoData, ...prev.slice(0, 4)]); // Keep last 5 deletions
+    
+    showEditFeedbackMessage('Task deleted successfully!', 'success');
+    showUndoNotificationWithTimeout();
+    setShowDeleteConfirmation(false);
+  };
+
+  const executeDeleteActivity = (taskId, activityId) => {
+    const task = tasks.find(t => t.id === taskId);
+    const activityToDelete = task?.activities.find(a => a.id === activityId);
+    if (!task || !activityToDelete) return;
+    
+    // Store for undo functionality
+    const undoData = {
+      type: 'activity',
+      item: activityToDelete,
+      parentTaskId: taskId,
+      timestamp: Date.now(),
+      originalTasks: [...tasks]
+    };
+    
+    setTasks(prevTasks => {
+      const newTasks = prevTasks.map(task => {
+        if (task.id === taskId) {
+          return {
+            ...task,
+            activities: task.activities.filter(activity => activity.id !== activityId)
+          };
+        }
+        return task;
+      });
+      return newTasks;
+    });
+    
+    // Add to undo history
+    setDeletedItemsHistory(prev => [undoData, ...prev.slice(0, 4)]); // Keep last 5 deletions
+    
+    showEditFeedbackMessage('Activity deleted successfully!', 'success');
+    showUndoNotificationWithTimeout();
+    setShowDeleteConfirmation(false);
+  };
+
+  const undoLastDeletion = () => {
+    if (deletedItemsHistory.length === 0) return;
+    
+    const lastDeletion = deletedItemsHistory[0];
+    setTasks(lastDeletion.originalTasks);
+    setDeletedItemsHistory(prev => prev.slice(1));
+    
+    showEditFeedbackMessage(
+      `${lastDeletion.type === 'task' ? 'Task' : 'Activity'} "${lastDeletion.item.name}" restored successfully!`, 
+      'success'
+    );
+    setShowUndoNotification(false);
+  };
+
+  const showUndoNotificationWithTimeout = () => {
+    setShowUndoNotification(true);
+    setTimeout(() => {
+      setShowUndoNotification(false);
+    }, 10000); // Show undo option for 10 seconds
   };
   
-  // Delete activity
+  // Legacy delete functions - now redirect to enhanced versions
+  const deleteTask = (taskId) => {
+    initiateDeleteTask(taskId);
+  };
+  
   const deleteActivity = (taskId, activityId) => {
-    if (window.confirm('Are you sure you want to delete this activity?')) {
-      setTasks(prevTasks => {
-        const newTasks = prevTasks.map(task => {
-          if (task.id === taskId) {
-            return {
-              ...task,
-              activities: task.activities.filter(activity => activity.id !== activityId)
-            };
-          }
-          return task;
-        });
-        showEditFeedbackMessage('Activity deleted successfully!', 'success');
-        return newTasks;
-      });
-    }
+    initiateDeleteActivity(taskId, activityId);
   };
   
   // Focus input when add row modal opens
@@ -824,6 +1214,110 @@ const ThesisGanttChart = () => {
       addRowInputRef.current.focus();
     }
   }, [showAddRowModal]);
+
+  // Enhanced Delete Confirmation Modal Component
+  const DeleteConfirmationModal = () => {
+    if (!showDeleteConfirmation || !deleteConfirmationData) return null;
+    
+    const { type, item, parentTask, dependents, timelineIssues, onConfirm } = deleteConfirmationData;
+    const hasIssues = dependents.length > 0 || timelineIssues.length > 0;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-red-600">
+              Confirm {type === 'task' ? 'Task' : 'Activity'} Deletion
+            </h2>
+            <button 
+              onClick={() => setShowDeleteConfirmation(false)}
+              className="bg-gray-200 rounded-full p-2 hover:bg-gray-300"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+              <p className="font-medium text-gray-800">
+                Are you sure you want to delete {type === 'task' ? 'task' : 'activity'}: 
+                <span className="font-bold text-red-700"> &quot;{item.name}&quot;</span>
+                {type === 'task' && ' and all its activities'}?
+              </p>
+              {parentTask && (
+                <p className="text-sm text-gray-600 mt-1">
+                  From task: <span className="font-medium">{parentTask.name}</span>
+                </p>
+              )}
+            </div>
+            
+            {dependents.length > 0 && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded">
+                <h4 className="font-semibold text-red-800 mb-2">⚠️ Dependency Warning</h4>
+                <p className="text-sm text-red-700 mb-2">
+                  The following activities may be affected by this deletion:
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  {dependents.map((dep, index) => (
+                    <li key={index} className="text-sm text-red-600">
+                      <span className="font-medium">{dep.task}</span> → {dep.activity}
+                      <span className="text-xs ml-1">({dep.type} dependency)</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {timelineIssues.length > 0 && (
+              <div className="p-3 bg-orange-50 border border-orange-200 rounded">
+                <h4 className="font-semibold text-orange-800 mb-2">📅 Timeline Issues</h4>
+                <ul className="list-disc pl-5 space-y-1">
+                  {timelineIssues.map((issue, index) => (
+                    <li key={index} className="text-sm text-orange-700">{issue}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {!hasIssues && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded">
+                <p className="text-sm text-green-700">
+                  ✅ No dependencies or timeline issues detected. Safe to delete.
+                </p>
+              </div>
+            )}
+            
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+              <p className="text-sm text-blue-700">
+                💡 <strong>Tip:</strong> You can undo this deletion within 10 seconds after confirming.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={() => setShowDeleteConfirmation(false)}
+              className="px-4 py-2 text-gray-600 bg-gray-200 rounded hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className={`px-4 py-2 text-white rounded ${
+                hasIssues 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-orange-600 hover:bg-orange-700'
+              }`}
+            >
+              {hasIssues ? 'Delete Anyway' : 'Confirm Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Add Row Modal Component
   const AddRowModal = () => {
@@ -1064,7 +1558,70 @@ const ThesisGanttChart = () => {
       
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">AI-Enabled CSV to CSA Transition: Thesis GANTT Chart</h1>
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 items-center">
+          {/* Auto-save Status Indicator */}
+          <div className="flex items-center space-x-2 text-sm">
+            <div className={`flex items-center px-2 py-1 rounded ${
+              saveStatus === 'saved' ? 'bg-green-100 text-green-800' :
+              saveStatus === 'saving' ? 'bg-yellow-100 text-yellow-800' :
+              saveStatus === 'error' ? 'bg-red-100 text-red-800' :
+              'bg-orange-100 text-orange-800'
+            }`}>
+              {saveStatus === 'saved' && (
+                <>
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  Saved
+                </>
+              )}
+              {saveStatus === 'saving' && (
+                <>
+                  <svg className="w-4 h-4 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Saving...
+                </>
+              )}
+              {saveStatus === 'error' && (
+                <>
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  Error
+                </>
+              )}
+              {saveStatus === 'unsaved' && (
+                <>
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  Unsaved
+                </>
+              )}
+            </div>
+            
+            {/* Manual Save Button */}
+            <button
+              onClick={manualSave}
+              disabled={saveStatus === 'saving'}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs flex items-center disabled:opacity-50"
+              title="Save manually"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+              Save
+            </button>
+            
+            {/* Last Save Time */}
+            {lastSaveTime && (
+              <span className="text-xs text-gray-500" title={`Last saved: ${lastSaveTime.toLocaleString()}`}>
+                {lastSaveTime.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+          
           <button 
             onClick={() => setShowAddRowModal(true)} 
             className="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded flex items-center"
@@ -1213,6 +1770,43 @@ const ThesisGanttChart = () => {
         </div>
       )}
       
+      {/* Auto-save Error Notification */}
+      {saveError && (
+        <div className="fixed top-16 right-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md shadow-lg z-50 max-w-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div>
+                <span className="font-medium">Auto-save Error</span>
+                <p className="text-sm mt-1">{saveError}</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1 ml-4">
+              <button
+                onClick={manualSave}
+                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
+              >
+                Retry
+              </button>
+              <button
+                onClick={recoverUnsavedChanges}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs"
+              >
+                Recover
+              </button>
+              <button
+                onClick={() => setSaveError(null)}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Feedback Notification */}
       {showEditFeedback.show && (
         <div 
@@ -1236,13 +1830,46 @@ const ThesisGanttChart = () => {
           </div>
         </div>
       )}
+
+      {/* Undo Deletion Notification */}
+      {showUndoNotification && deletedItemsHistory.length > 0 && (
+        <div className="fixed top-4 left-4 p-4 bg-blue-100 border border-blue-300 text-blue-800 rounded-md shadow-lg z-50 max-w-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z"></path>
+                </svg>
+                <span className="font-medium">Item Deleted</span>
+              </div>
+              <p className="text-sm mt-1">
+                &quot;{deletedItemsHistory[0]?.item.name}&quot; was deleted
+              </p>
+            </div>
+            <div className="flex flex-col gap-1 ml-4">
+              <button
+                onClick={undoLastDeletion}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium"
+              >
+                Undo
+              </button>
+              <button
+                onClick={() => setShowUndoNotification(false)}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="overflow-x-auto">
         <table className="border-collapse w-full min-w-max">
           <thead>
             <tr>
               <th className="border border-gray-300 bg-gray-100 p-2 w-48 text-left">Tasks & Activities</th>
-              {weeks.map((week, weekIndex) => (
+              {weeks.map((week) => (
                 <th key={week.name} colSpan={7} className="border border-gray-300 bg-gray-800 text-white p-1 text-center text-xs">
                   {week.name}
                 </th>
@@ -1253,7 +1880,7 @@ const ThesisGanttChart = () => {
             <tr>
               <th className="border border-gray-300 bg-gray-100"></th>
               {weeks.map((week, weekIndex) => (
-                week.days.map((day, dayIndex) => (
+                week.days.map((day) => (
                   <th key={`${weekIndex}-${day}`} className="border border-gray-300 bg-gray-200 w-6 p-1 text-center text-xs">
                     {day}
                   </th>
@@ -1457,6 +2084,15 @@ const ThesisGanttChart = () => {
           <li>Progress and structure changes are automatically saved in your browser</li>
         </ul>
       </div>
+      
+      {/* Instructions Modal */}
+      {showInstructions && <InstructionsModal />}
+      
+      {/* Add Row Modal */}
+      {showAddRowModal && <AddRowModal />}
+      
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal />
     </div>
   );
 };
