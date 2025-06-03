@@ -57,6 +57,7 @@ Visit the live application: [https://danik911.github.io/thesis-gantt-chart/](htt
 - Node.js (v14.17.0 or later)
 - npm (v6.14.13 or later)
 - Git
+- GitHub account for OAuth setup
 
 ### Installation
 
@@ -71,110 +72,20 @@ cd thesis-gantt-chart
 npm install
 ```
 
-3. Start the development server:
+3. Set up your environment variables:
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+# GitHub OAuth Configuration
+REACT_APP_GITHUB_CLIENT_ID=your_github_client_id_here
+REACT_APP_GITHUB_CLIENT_SECRET=your_github_client_secret_here
+REACT_APP_GITHUB_REDIRECT_URI=http://localhost:3000/auth/callback
+```
+
+**Important**: Never commit your `.env` file to version control. Add it to `.gitignore`.
+
+4. Start the development server:
 ```bash
 npm start
 ```
-
-4. Open [http://localhost:3000](http://localhost:3000) to view the application in your browser.
-
-### Available Scripts
-
-- `npm start` - Runs the app in development mode
-- `npm test` - Launches the test runner
-- `npm run build` - Builds the app for production
-- `npm run deploy` - Deploys the app to GitHub Pages
-- `npm run lint` - Runs ESLint for code quality checks
-- `npm run format` - Formats code using Prettier
-
-## 🏛️ Project Structure
-
-```
-thesis-gantt-chart/
-├── public/                 # Static files
-├── src/
-│   ├── components/         # React components
-│   │   └── WeeklyGanttChart.js
-│   ├── App.js             # Main application component
-│   ├── App.css            # Application styles
-│   ├── index.js           # Application entry point
-│   └── index.css          # Global styles
-├── .github/
-│   └── workflows/         # GitHub Actions workflows
-├── package.json           # Project dependencies and scripts
-├── tailwind.config.js     # Tailwind CSS configuration
-├── postcss.config.js      # PostCSS configuration
-└── README.md             # Project documentation
-```
-
-## 👥 Target Users
-
-1. **PhD Candidate** (Primary): Complete thesis management and daily progress tracking
-2. **Supervisor**: Review progress, access uploaded materials, monitor timeline
-3. **Viva Commission**: Access final timeline and supporting documentation
-
-## 🎯 Key Features
-
-### Current Features
-- Interactive GANTT chart visualization
-- Timeline management for thesis tasks
-- Responsive design with Tailwind CSS
-- GitHub Pages deployment
-
-### Planned Enhancements
-- **Row Management**: Edit, add, and delete GANTT chart rows
-- **Primary Data Collection**: Integrated research task management
-- **Daily Progress Tracking**: Calendar-based documentation system
-- **File Management**: Multi-format file upload and organization
-- **Collaboration Tools**: Multi-user access and sharing capabilities
-
-## 🔧 Development Guidelines
-
-### Code Style
-- Use Prettier for code formatting
-- Follow ESLint rules for code quality
-- Use meaningful variable and function names
-- Write comments for complex logic
-
-### Git Workflow
-1. Create feature branches from `main`
-2. Make small, focused commits
-3. Use descriptive commit messages
-4. Create pull requests for code review
-5. Merge to `main` after approval
-
-### Testing
-- Write unit tests for new components
-- Test responsiveness across devices
-- Validate accessibility requirements
-- Ensure cross-browser compatibility
-
-## 📝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/enhancement-name`)
-3. Commit your changes (`git commit -m 'Add some enhancement'`)
-4. Push to the branch (`git push origin feature/enhancement-name`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is private and intended for academic use in thesis management.
-
-## 🤝 Support
-
-For questions, suggestions, or issues, please create an issue in the GitHub repository or contact the development team.
-
-## 🎓 Academic Context
-
-This application is designed specifically for PhD thesis management, incorporating best practices for:
-- Research timeline management
-- Primary data collection organization
-- Supervisor-student collaboration
-- Viva preparation and documentation
-
----
-
-**Version**: 0.1.0  
-**Last Updated**: 2024  
-**Status**: Active Development 

@@ -1,0 +1,51 @@
+/* Calendar Component Styles */
+.calendar-wrapper .fc-day-with-entries {
+  position: relative;
+}
+
+.calendar-wrapper .fc-day-with-entries::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  background-color: #16a34a;
+  border-radius: 50%;
+}
+
+.calendar-wrapper .fc-day-selected {
+  background-color: #dbeafe !important;
+  border-color: #2563eb !important;
+}
+
+.calendar-wrapper .fc-daygrid-day:hover {
+  background-color: #f3f4f6;
+  cursor: pointer;
+}
+
+.calendar-wrapper .fc-day-disabled:hover {
+  background-color: inherit;
+  cursor: not-allowed;
+}
+
+.calendar-wrapper .fc-button {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.calendar-wrapper .fc-button:hover {
+  background-color: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.calendar-wrapper .fc-button-primary {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.calendar-wrapper .fc-today-button {
+  background-color: #16a34a;
+  border-color: #16a34a;
+} 

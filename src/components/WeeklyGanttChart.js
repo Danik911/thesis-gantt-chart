@@ -133,62 +133,6 @@ const ThesisGanttChart = () => {
       saveState(taskData);
     }, SAVE_DELAY);
   }, [saveState]);
-  
-  // Manual save function
-  const manualSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveState(tasks);
-  }, [saveState, tasks]);
-  
-  // Recovery mechanism
-  const recoverUnsavedChanges = useCallback(() => {
-    try {
-      const backup = localStorage.getItem('gantt-tasks-backup');
-      if (backup) {
-        const recoveredTasks = decompressData(backup);
-        setTasks(recoveredTasks);
-        setSaveStatus('saved');
-        alert('Unsaved changes have been recovered from backup.');
-      }
-    } catch (error) {
-      alert('Failed to recover backup data.');
-    }
-  }, [decompressData]);
-  
-  // Load tasks on component mount
-  useEffect(() => {
-    const savedTasks = localStorage.getItem('gantt-tasks');
-    if (savedTasks) {
-      try {
-        const decompressed = decompressData(savedTasks);
-        setTasks(decompressed);
-        setSaveStatus('saved');
-        
-        const saveTimestamp = localStorage.getItem('gantt-save-timestamp');
-        if (saveTimestamp) {
-          setLastSaveTime(new Date(parseInt(saveTimestamp)));
-        }
-      } catch (error) {
-        setSaveError('Error loading saved tasks: ' + error.message);
-        // Check if backup is available
-        const backup = localStorage.getItem('gantt-tasks-backup');
-        if (backup) {
-          if (window.confirm('Failed to load main data. Would you like to recover from backup?')) {
-            recoverUnsavedChanges();
-          }
-        }
-      }
-    }
-     }, [decompressData, recoverUnsavedChanges]);
-  
-  // Auto-save tasks when they change
-  useEffect(() => {
-    if (tasks.length > 0) {
-      debouncedSave(tasks);
-    }
-  }, [tasks, debouncedSave]);
 
   // State for instruction modal
   const [showInstructions, setShowInstructions] = useState(false);
@@ -553,6 +497,62 @@ const ThesisGanttChart = () => {
       ]
     }
   ]);
+
+  // Manual save function
+  const manualSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveState(tasks);
+  }, [saveState, tasks]);
+  
+  // Recovery mechanism
+  const recoverUnsavedChanges = useCallback(() => {
+    try {
+      const backup = localStorage.getItem('gantt-tasks-backup');
+      if (backup) {
+        const recoveredTasks = decompressData(backup);
+        setTasks(recoveredTasks);
+        setSaveStatus('saved');
+        alert('Unsaved changes have been recovered from backup.');
+      }
+    } catch (error) {
+      alert('Failed to recover backup data.');
+    }
+  }, [decompressData]);
+  
+  // Load tasks on component mount
+  useEffect(() => {
+    const savedTasks = localStorage.getItem('gantt-tasks');
+    if (savedTasks) {
+      try {
+        const decompressed = decompressData(savedTasks);
+        setTasks(decompressed);
+        setSaveStatus('saved');
+        
+        const saveTimestamp = localStorage.getItem('gantt-save-timestamp');
+        if (saveTimestamp) {
+          setLastSaveTime(new Date(parseInt(saveTimestamp)));
+        }
+      } catch (error) {
+        setSaveError('Error loading saved tasks: ' + error.message);
+        // Check if backup is available
+        const backup = localStorage.getItem('gantt-tasks-backup');
+        if (backup) {
+          if (window.confirm('Failed to load main data. Would you like to recover from backup?')) {
+            recoverUnsavedChanges();
+          }
+        }
+      }
+    }
+  }, [decompressData, recoverUnsavedChanges]);
+  
+  // Auto-save tasks when they change
+  useEffect(() => {
+    if (tasks.length > 0) {
+      debouncedSave(tasks);
+    }
+  }, [tasks, debouncedSave]);
 
   // Owner information
   const owners = {
