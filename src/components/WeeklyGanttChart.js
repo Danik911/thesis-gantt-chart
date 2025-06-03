@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import FileTooltip from './FileTooltip';
+import FilePreviewModal from './FilePreviewModal';
+import FileSearch from './FileSearch';
+import ExportPanel from './ExportPanel';
 
 const ThesisGanttChart = () => {
   // State for the tooltip/hover details and position
@@ -7,6 +11,18 @@ const ThesisGanttChart = () => {
   
   // State for tracking completed days
   const [completedDays, setCompletedDays] = useState({});
+  
+  // File-related states
+  const [fileTooltip, setFileTooltip] = useState({
+    isVisible: false,
+    files: [],
+    position: { x: 0, y: 0 }
+  });
+  const [previewFile, setPreviewFile] = useState(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
+  const [showFileSearch, setShowFileSearch] = useState(false);
+  const [draggedFile, setDraggedFile] = useState(null);
+  const [dropTargetActivity, setDropTargetActivity] = useState(null);
   
   // Auto-save states
   const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'saving', 'error', 'unsaved'
@@ -137,6 +153,9 @@ const ThesisGanttChart = () => {
   // State for instruction modal
   const [showInstructions, setShowInstructions] = useState(false);
   
+  // State for export panel
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  
   // State for row editing functionality
   const [editingRow, setEditingRow] = useState(null); // { type: 'task'|'activity', id: number, originalName: string }
   const [editValue, setEditValue] = useState('');
@@ -198,6 +217,26 @@ const ThesisGanttChart = () => {
           weeks: [0], 
           days: [1, 2, 3], 
           owner: "ME",
+          files: [
+            {
+              name: "thesis-proposal-draft.pdf",
+              type: "pdf",
+              size: 2048576,
+              uploadDate: "2024-06-01",
+              description: "Initial thesis proposal draft",
+              tags: ["proposal", "draft"],
+              url: "#"
+            },
+            {
+              name: "research-objectives.pdf",
+              type: "pdf", 
+              size: 512000,
+              uploadDate: "2024-06-02",
+              description: "Detailed research objectives document",
+              tags: ["objectives", "research"],
+              url: "#"
+            }
+          ],
           color: "bg-blue-400",
           isGateway: false
         },
@@ -207,6 +246,7 @@ const ThesisGanttChart = () => {
           weeks: [0, 1], 
           days: [4, 5, 6, 0, 1], 
           owner: "ME",
+          files: [],
           color: "bg-blue-400",
           isGateway: true,
           gatewayInfo: {
@@ -227,6 +267,17 @@ const ThesisGanttChart = () => {
           weeks: [0, 1], 
           days: [1, 2, 3, 4, 5, 6, 0], 
           owner: "ME",
+          files: [
+            {
+              name: "requirements-notes.m4a",
+              type: "m4a",
+              size: 5242880,
+              uploadDate: "2024-06-03",
+              description: "Voice notes from stakeholder interviews",
+              tags: ["requirements", "interviews", "audio"],
+              url: "#"
+            }
+          ],
           color: "bg-purple-400",
           isGateway: false
         },
@@ -236,6 +287,7 @@ const ThesisGanttChart = () => {
           weeks: [1, 2], 
           days: [1, 2, 3, 4, 5, 6, 0, 1, 2, 3], 
           owner: "ME",
+          files: [],
           color: "bg-purple-400", 
           isGateway: false
         },
@@ -245,6 +297,7 @@ const ThesisGanttChart = () => {
           weeks: [2, 3], 
           days: [4, 5, 6, 0, 1, 2, 3], 
           owner: "ME",
+          files: [],
           color: "bg-purple-400", 
           isGateway: false
         },
@@ -254,6 +307,26 @@ const ThesisGanttChart = () => {
           weeks: [3, 4, 5, 6], 
           days: [4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3], 
           owner: "ME",
+          files: [
+            {
+              name: "sprint-planning-notes.wav",
+              type: "wav",
+              size: 8388608,
+              uploadDate: "2024-07-01",
+              description: "Sprint planning meeting recording",
+              tags: ["sprint", "planning", "agile"],
+              url: "#"
+            },
+            {
+              name: "implementation-demo.mp3",
+              type: "mp3",
+              size: 6291456,
+              uploadDate: "2024-07-15",
+              description: "Demo recording of prototype implementation",
+              tags: ["demo", "prototype", "implementation"],
+              url: "#"
+            }
+          ],
           color: "bg-purple-400", 
           isGateway: false
         },
@@ -263,6 +336,7 @@ const ThesisGanttChart = () => {
           weeks: [6, 7, 8], 
           days: [4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0], 
           owner: "ME",
+          files: [],
           color: "bg-indigo-400", 
           isGateway: false
         },
@@ -272,6 +346,7 @@ const ThesisGanttChart = () => {
           weeks: [8, 9, 10], 
           days: [1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0], 
           owner: "ME",
+          files: [],
           color: "bg-indigo-400", 
           isGateway: true,
           gatewayInfo: {
@@ -292,6 +367,35 @@ const ThesisGanttChart = () => {
           weeks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 
           days: [1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0], // Ongoing throughout project
           owner: "ME",
+          files: [
+            {
+              name: "literature-review-sources.pdf",
+              type: "pdf",
+              size: 1048576,
+              uploadDate: "2024-06-05",
+              description: "Compiled literature review sources and summaries",
+              tags: ["literature", "sources", "research"],
+              url: "#"
+            },
+            {
+              name: "csv-csa-comparison.pdf",
+              type: "pdf",
+              size: 3145728,
+              uploadDate: "2024-06-10",
+              description: "Detailed comparison between CSV and CSA approaches",
+              tags: ["csv", "csa", "comparison"],
+              url: "#"
+            },
+            {
+              name: "ai-validation-research.pdf",
+              type: "pdf",
+              size: 2097152,
+              uploadDate: "2024-06-15",
+              description: "Research on AI applications in validation processes",
+              tags: ["ai", "validation", "research"],
+              url: "#"
+            }
+          ],
           color: "bg-green-300", 
           isGateway: false
         },
@@ -301,6 +405,7 @@ const ThesisGanttChart = () => {
           weeks: [1, 2], 
           days: [0, 1, 2, 3, 4, 5, 6, 0], 
           owner: "ME",
+          files: [],
           color: "bg-pink-400", 
           isGateway: false
         },
@@ -310,6 +415,7 @@ const ThesisGanttChart = () => {
           weeks: [2, 3, 4], 
           days: [1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0], 
           owner: "ME",
+          files: [],
           color: "bg-pink-400", 
           isGateway: false
         },
@@ -319,6 +425,7 @@ const ThesisGanttChart = () => {
           weeks: [4, 5], 
           days: [1, 2, 3, 4, 5, 6, 0, 1, 2, 3], 
           owner: "ME",
+          files: [],
           color: "bg-pink-400", 
           isGateway: false
         },
@@ -328,6 +435,7 @@ const ThesisGanttChart = () => {
           weeks: [5, 6, 7, 8], 
           days: [4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3], 
           owner: "ME",
+          files: [],
           color: "bg-green-400", 
           isGateway: true,
           gatewayInfo: {
@@ -342,6 +450,7 @@ const ThesisGanttChart = () => {
           weeks: [8, 9, 10], 
           days: [4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4], 
           owner: "ME",
+          files: [],
           color: "bg-pink-400", 
           isGateway: false
         }
@@ -357,6 +466,7 @@ const ThesisGanttChart = () => {
           weeks: [6], 
           days: [3, 4, 5], 
           owner: "SV",
+          files: [],
           color: "bg-red-400", 
           isGateway: true,
           gatewayInfo: {
@@ -371,6 +481,7 @@ const ThesisGanttChart = () => {
           weeks: [10, 11], 
           days: [1, 2, 3, 4, 5, 6, 0], 
           owner: "SME",
+          files: [],
           color: "bg-purple-300", 
           isGateway: true,
           gatewayInfo: {
@@ -385,6 +496,7 @@ const ThesisGanttChart = () => {
           weeks: [11, 12], 
           days: [1, 2, 3, 4, 5, 6, 0], 
           owner: "ME",
+          files: [],
           color: "bg-pink-400", 
           isGateway: false
         },
@@ -394,6 +506,7 @@ const ThesisGanttChart = () => {
           weeks: [12], 
           days: [1, 2, 3], 
           owner: "ME",
+          files: [],
           color: "bg-blue-300", 
           isGateway: false
         },
@@ -403,6 +516,7 @@ const ThesisGanttChart = () => {
           weeks: [12], 
           days: [4, 5], 
           owner: "ME",
+          files: [],
           color: "bg-blue-300", 
           isGateway: false
         },
@@ -412,6 +526,7 @@ const ThesisGanttChart = () => {
           weeks: [12, 13], 
           days: [6, 0, 1], 
           owner: "ME",
+          files: [],
           color: "bg-blue-300", 
           isGateway: true,
           gatewayInfo: {
@@ -695,6 +810,11 @@ const ThesisGanttChart = () => {
     const dayKey = `${activity.id}-${weekIndex}-${dayIndex}`;
     const isCompleted = completedDays[dayKey];
     
+    // File-related checks for Task 13
+    const activityHasFiles = hasFiles(activity);
+    const fileCount = getFileCount(activity);
+    const isDropTarget = dropTargetActivity === activity.id;
+    
     // Determine the cell color
     let cellColor = 'bg-white';
     
@@ -717,12 +837,17 @@ const ThesisGanttChart = () => {
         
         setTooltipPosition({ x: centerX, y: bottomY });
         setHoveredGateway(activity.gatewayInfo);
+      } else if (isActiveDay && activityHasFiles) {
+        // Show file tooltip on hover for activities with files
+        handleFileTooltipShow(e, activity);
       }
     };
     
     const handleMouseLeave = () => {
       if (isGatewayCell) {
         setHoveredGateway(null);
+      } else if (isActiveDay && activityHasFiles) {
+        handleFileTooltipHide();
       }
     };
     
@@ -736,20 +861,44 @@ const ThesisGanttChart = () => {
     return (
       <td 
         key={`${weekIndex}-${dayIndex}-${activity.id}`} 
-        className={`border border-gray-200 w-6 h-6 
+        className={`border border-gray-200 w-6 h-6 relative
           ${cellColor} 
           ${isFirstDay ? 'rounded-l' : ''} 
           ${isLastDay ? 'rounded-r' : ''}
-          ${isActiveDay ? 'cursor-pointer hover:opacity-80' : ''}`
+          ${isActiveDay ? 'cursor-pointer hover:opacity-80' : ''}
+          ${isDropTarget ? 'ring-2 ring-blue-400 ring-opacity-75' : ''}`
         }
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
+        onDragEnter={(e) => isActiveDay && handleFileDragEnter(e, activity.id)}
+        onDragOver={(e) => isActiveDay && handleFileDragOver(e)}
+        onDragLeave={(e) => isActiveDay && handleFileDragLeave(e)}
+        onDrop={(e) => isActiveDay && handleFileDrop(e, activity.id)}
       >
+        {/* Completion checkmark */}
         {isCompleted && (
-          <div className="flex items-center justify-center h-full">
+          <div className="absolute inset-0 flex items-center justify-center z-10">
             <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+        )}
+        
+        {/* File count indicator - Task 13 feature */}
+        {isActiveDay && activityHasFiles && isFirstDay && (
+          <div className="absolute -top-1 -right-1 z-20">
+            <div className="bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center text-center leading-none font-bold">
+              {fileCount > 9 ? '9+' : fileCount}
+            </div>
+          </div>
+        )}
+        
+        {/* File icon indicator for activities with files - Task 13 feature */}
+        {isActiveDay && activityHasFiles && !isCompleted && (
+          <div className="absolute bottom-0 left-0 z-10">
+            <svg className="w-2 h-2 text-white opacity-80" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M4 4v12h12V8l-4-4H4zm8 0v3h3l-3-3z"/>
             </svg>
           </div>
         )}
@@ -1551,17 +1700,196 @@ const ThesisGanttChart = () => {
     );
   };
 
+  // File Management Functions for Task 13 Integration
+  const getAllFiles = () => {
+    const allFiles = [];
+    tasks.forEach(task => {
+      task.activities.forEach(activity => {
+        if (activity.files && activity.files.length > 0) {
+          activity.files.forEach(file => {
+            allFiles.push({
+              file: file,
+              activityId: activity.id,
+              activityName: activity.name,
+              taskId: task.id,
+              taskName: task.name
+            });
+          });
+        }
+      });
+    });
+    return allFiles;
+  };
+
+  const handleFileTooltipShow = (e, activity) => {
+    if (activity.files && activity.files.length > 0) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = window.pageXOffset + rect.left;
+      const y = window.pageYOffset + rect.top;
+      
+      setFileTooltip({
+        isVisible: true,
+        files: activity.files,
+        position: { x, y }
+      });
+    }
+  };
+
+  const handleFileTooltipHide = () => {
+    setFileTooltip({
+      isVisible: false,
+      files: [],
+      position: { x: 0, y: 0 }
+    });
+  };
+
+  const handleFileClick = (file) => {
+    setPreviewFile(file);
+    setShowFilePreview(true);
+    setFileTooltip({
+      isVisible: false,
+      files: [],
+      position: { x: 0, y: 0 }
+    });
+  };
+
+  const handleFilePreviewClose = () => {
+    setShowFilePreview(false);
+    setPreviewFile(null);
+  };
+
+  const handleFileSearchToggle = () => {
+    setShowFileSearch(!showFileSearch);
+  };
+
+  const handleFileSelect = (fileData) => {
+    setPreviewFile(fileData.file);
+    setShowFilePreview(true);
+    setShowFileSearch(false);
+  };
+
+  const addFileToActivity = (activityId, file) => {
+    setTasks(prevTasks => {
+      const newTasks = prevTasks.map(task => ({
+        ...task,
+        activities: task.activities.map(activity => {
+          if (activity.id === activityId) {
+            return {
+              ...activity,
+              files: [...(activity.files || []), file]
+            };
+          }
+          return activity;
+        })
+      }));
+      
+      // Trigger auto-save
+      debouncedSave(newTasks);
+      return newTasks;
+    });
+  };
+
+  const removeFileFromActivity = (activityId, fileIndex) => {
+    setTasks(prevTasks => {
+      const newTasks = prevTasks.map(task => ({
+        ...task,
+        activities: task.activities.map(activity => {
+          if (activity.id === activityId) {
+            const newFiles = [...(activity.files || [])];
+            newFiles.splice(fileIndex, 1);
+            return {
+              ...activity,
+              files: newFiles
+            };
+          }
+          return activity;
+        })
+      }));
+      
+      // Trigger auto-save
+      debouncedSave(newTasks);
+      return newTasks;
+    });
+  };
+
+  // Enhanced drag and drop handlers for files
+  const handleFileDragStart = (e, file, activityId) => {
+    setDraggedFile({ file, sourceActivityId: activityId });
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleFileDragEnter = (e, activityId) => {
+    e.preventDefault();
+    setDropTargetActivity(activityId);
+  };
+
+  const handleFileDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleFileDragLeave = (e) => {
+    e.preventDefault();
+    setDropTargetActivity(null);
+  };
+
+  const handleFileDrop = (e, targetActivityId) => {
+    e.preventDefault();
+    setDropTargetActivity(null);
+    
+    if (draggedFile && draggedFile.sourceActivityId !== targetActivityId) {
+      // Remove file from source activity
+      removeFileFromActivity(draggedFile.sourceActivityId, 
+        tasks.find(task => task.activities.find(act => act.id === draggedFile.sourceActivityId))
+          ?.activities.find(act => act.id === draggedFile.sourceActivityId)
+          ?.files.findIndex(f => f === draggedFile.file) || 0
+      );
+      
+      // Add file to target activity
+      addFileToActivity(targetActivityId, draggedFile.file);
+    }
+    
+    setDraggedFile(null);
+  };
+
+  const getFileCount = (activity) => {
+    return activity.files ? activity.files.length : 0;
+  };
+
+  const hasFiles = (activity) => {
+    return activity.files && activity.files.length > 0;
+  };
+
   return (
-    <div className="p-2 bg-white rounded-lg shadow-lg overflow-x-auto relative">
+    <div className="p-2 sm:p-4 lg:p-6 bg-white rounded-lg shadow-lg overflow-x-auto relative">
       {showInstructions && <InstructionsModal />}
       <AddRowModal />
       
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">AI-Enabled CSV to CSA Transition: Thesis GANTT Chart</h1>
-        <div className="flex space-x-2 items-center">
-          {/* Auto-save Status Indicator */}
-          <div className="flex items-center space-x-2 text-sm">
-            <div className={`flex items-center px-2 py-1 rounded ${
+      {/* Mobile-Optimized Header */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 gap-3 lg:gap-0">
+        <h1 className="text-lg sm:text-xl lg:text-2xl font-bold leading-tight">
+          <span className="hidden sm:inline">AI-Enabled CSV to CSA Transition: </span>
+          <span className="sm:hidden">CSV to CSA: </span>
+          Thesis GANTT Chart
+        </h1>
+        
+        {/* Mobile-First Control Buttons */}
+        <div className="flex flex-col sm:flex-row w-full lg:w-auto space-y-2 sm:space-y-0 sm:space-x-2 items-stretch sm:items-center text-sm">
+          {/* File Search Button - Mobile Optimized */}
+          <button
+            onClick={handleFileSearchToggle}
+            className="bg-purple-100 hover:bg-purple-200 text-purple-800 px-3 py-2 sm:py-1 rounded flex items-center justify-center sm:justify-start touch-manipulation min-h-[44px] sm:min-h-[auto]"
+            title="Search all files across activities"
+          >
+            <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <span>Files ({getAllFiles().length})</span>
+          </button>
+          
+          {/* Auto-save Status Indicator - Mobile Optimized */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 text-sm w-full sm:w-auto">
+            <div className={`flex items-center justify-center sm:justify-start px-3 py-2 sm:px-2 sm:py-1 rounded touch-manipulation min-h-[44px] sm:min-h-[auto] ${
               saveStatus === 'saved' ? 'bg-green-100 text-green-800' :
               saveStatus === 'saving' ? 'bg-yellow-100 text-yellow-800' :
               saveStatus === 'error' ? 'bg-red-100 text-red-800' :
@@ -1601,116 +1929,139 @@ const ThesisGanttChart = () => {
               )}
             </div>
             
-            {/* Manual Save Button */}
+            {/* Manual Save Button - Mobile Optimized */}
             <button
               onClick={manualSave}
               disabled={saveStatus === 'saving'}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs flex items-center disabled:opacity-50"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 sm:px-2 sm:py-1 rounded text-sm sm:text-xs flex items-center justify-center sm:justify-start disabled:opacity-50 touch-manipulation min-h-[44px] sm:min-h-[auto]"
               title="Save manually"
             >
-              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 sm:w-3 sm:h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"></path>
               </svg>
-              Save
+              <span>Save</span>
             </button>
             
-            {/* Last Save Time */}
+            {/* Last Save Time - Hidden on mobile, shown on larger screens */}
             {lastSaveTime && (
-              <span className="text-xs text-gray-500" title={`Last saved: ${lastSaveTime.toLocaleString()}`}>
+              <span className="hidden sm:block text-xs text-gray-500 text-center sm:text-left" title={`Last saved: ${lastSaveTime.toLocaleString()}`}>
                 {lastSaveTime.toLocaleTimeString()}
               </span>
             )}
           </div>
           
-          <button 
-            onClick={() => setShowAddRowModal(true)} 
-            className="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded flex items-center"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            Add Row
-          </button>
-          <button 
-            onClick={() => setShowInstructions(true)} 
-            className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded flex items-center"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            Help
-          </button>
+          {/* Action Buttons - Mobile Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:flex gap-2 w-full sm:w-auto">
+            <button 
+              onClick={() => setShowExportPanel(true)} 
+              className="bg-indigo-100 hover:bg-indigo-200 text-indigo-800 px-3 py-2 sm:py-1 rounded flex items-center justify-center sm:justify-start touch-manipulation min-h-[44px] sm:min-h-[auto]"
+            >
+              <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <span>Export</span>
+            </button>
+            <button 
+              onClick={() => setShowAddRowModal(true)} 
+              className="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-2 sm:py-1 rounded flex items-center justify-center sm:justify-start touch-manipulation min-h-[44px] sm:min-h-[auto]"
+            >
+              <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              <span>Add Row</span>
+            </button>
+            <button 
+              onClick={() => setShowInstructions(true)} 
+              className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-2 sm:py-1 rounded flex items-center justify-center sm:justify-start touch-manipulation min-h-[44px] sm:min-h-[auto]"
+            >
+              <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>Help</span>
+            </button>
+          </div>
         </div>
       </div>
       
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">Project Timeline: June 1 - September 1, 2024</h2>
+      {/* Project Info - Mobile Optimized */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 gap-2 lg:gap-0">
+        <h2 className="text-base sm:text-lg font-semibold">
+          <span className="hidden sm:inline">Project Timeline: June 1 - September 1, 2024</span>
+          <span className="sm:hidden">Timeline: Jun-Sep 2024</span>
+        </h2>
         <div className="text-sm text-gray-600">
-          <span className="font-medium">Daniil Vladimirov</span> | Student #3154227
+          <span className="font-medium">Daniil Vladimirov</span>
+          <span className="hidden sm:inline"> | Student #3154227</span>
+          <div className="sm:hidden text-xs text-gray-500">#3154227</div>
         </div>
       </div>
       
+      {/* Research Objectives - Mobile First Grid */}
       <div className="mb-6">
-        <h3 className="text-md font-semibold mb-2">Research Objectives:</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-          <div className="bg-gray-100 p-2 rounded">1. Analyze existing CSV practices</div>
-          <div className="bg-gray-100 p-2 rounded">2. Investigate CSA&apos;s risk-based approach</div>
-          <div className="bg-gray-100 p-2 rounded">3. Conduct gap analysis for CSV to CSA transition</div>
-          <div className="bg-gray-100 p-2 rounded">4. Examine AI agent capabilities and limitations</div>
-          <div className="bg-gray-100 p-2 rounded">5. Suggest AI applications to bridge CSV-CSA gap</div>
-          <div className="bg-gray-100 p-2 rounded">6. Develop and test AI prototype for validation</div>
+        <h3 className="text-base sm:text-md font-semibold mb-3">Research Objectives:</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+          <div className="bg-gray-100 p-3 rounded touch-manipulation">1. Analyze existing CSV practices</div>
+          <div className="bg-gray-100 p-3 rounded touch-manipulation">2. Investigate CSA&rsquo;s risk-based approach</div>
+          <div className="bg-gray-100 p-3 rounded touch-manipulation">3. Conduct gap analysis for CSV to CSA transition</div>
+          <div className="bg-gray-100 p-3 rounded touch-manipulation">4. Examine AI agent capabilities and limitations</div>
+          <div className="bg-gray-100 p-3 rounded touch-manipulation">5. Suggest AI applications to bridge CSV-CSA gap</div>
+          <div className="bg-gray-100 p-3 rounded touch-manipulation">6. Develop and test AI prototype for validation</div>
         </div>
       </div>
       
+      {/* Legend - Mobile Optimized Grid */}
       <div className="mb-4">
-        <h3 className="text-md font-semibold mb-2">Legend:</h3>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-blue-400"></div>
+        <h3 className="text-base sm:text-md font-semibold mb-3">Legend:</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 text-xs sm:text-sm">
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-blue-400 flex-shrink-0"></div>
             <span>Planning</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-purple-400"></div>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-purple-400 flex-shrink-0"></div>
             <span>Development</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-indigo-400"></div>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-indigo-400 flex-shrink-0"></div>
             <span>Testing</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-green-300"></div>
-            <span>Ongoing Research</span>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-green-300 flex-shrink-0"></div>
+            <span className="hidden sm:inline">Ongoing Research</span>
+            <span className="sm:hidden">Ongoing</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-green-400"></div>
-            <span>Research Activities</span>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-green-400 flex-shrink-0"></div>
+            <span className="hidden sm:inline">Research Activities</span>
+            <span className="sm:hidden">Research</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-pink-400"></div>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-pink-400 flex-shrink-0"></div>
             <span>Writing</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-red-400"></div>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-red-400 flex-shrink-0"></div>
             <span>Review</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-blue-300"></div>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-blue-300 flex-shrink-0"></div>
             <span>Finalization</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-amber-500"></div>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-amber-500 flex-shrink-0"></div>
             <span>Gateway</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 mr-1 bg-gray-400"></div>
+          <div className="flex items-center p-2 sm:p-0 bg-gray-50 sm:bg-transparent rounded sm:rounded-none">
+            <div className="w-4 h-4 mr-2 bg-gray-400 flex-shrink-0"></div>
             <span>Completed</span>
           </div>
         </div>
       </div>
       
+      {/* Resources Section - Mobile Optimized */}
       <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-md font-semibold">Resources:</h3>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2 sm:gap-0">
+          <h3 className="text-base sm:text-md font-semibold">Resources:</h3>
           <button
             onClick={() => {
               if (window.confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
@@ -1720,12 +2071,12 @@ const ThesisGanttChart = () => {
                 window.location.reload();
               }
             }}
-            className="text-xs text-red-600 hover:text-red-800 border border-red-300 rounded px-2 py-1 hover:bg-red-50"
+            className="text-xs sm:text-xs text-red-600 hover:text-red-800 border border-red-300 rounded px-3 py-2 sm:px-2 sm:py-1 hover:bg-red-50 touch-manipulation min-h-[44px] sm:min-h-[auto] w-full sm:w-auto flex items-center justify-center"
           >
             Reset Progress
           </button>
         </div>
-        <div className="flex flex-wrap gap-3 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3 text-sm">
           {Object.entries(owners).map(([key, value]) => (
             <div key={key} className="flex items-center">
               <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center mr-1">
@@ -1738,7 +2089,7 @@ const ThesisGanttChart = () => {
       </div>
       
       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded flex items-center justify-between">
-        <p className="text-sm font-medium">Click on colored cells to mark progress. Hover over task/activity names to edit them. Use &quot;Add Row&quot; to create new tasks/activities. Drag tasks to reorder them. Your changes are automatically saved.</p>
+        <p className="text-sm font-medium">Click on colored cells to mark progress. Hover over task/activity names to edit them. Use &ldquo;Add Row&rdquo; to create new tasks/activities. Drag tasks to reorder them. Your changes are automatically saved.</p>
         <button 
           onClick={() => setShowInstructions(true)}
           className="text-blue-700 hover:text-blue-900 text-sm font-medium"
@@ -1843,7 +2194,7 @@ const ThesisGanttChart = () => {
                 <span className="font-medium">Item Deleted</span>
               </div>
               <p className="text-sm mt-1">
-                &quot;{deletedItemsHistory[0]?.item.name}&quot; was deleted
+                &ldquo;{deletedItemsHistory[0]?.item.name}&rdquo; was deleted
               </p>
             </div>
             <div className="flex flex-col gap-1 ml-4">
@@ -1864,25 +2215,37 @@ const ThesisGanttChart = () => {
         </div>
       )}
       
-      <div className="overflow-x-auto">
+      {/* Mobile-Optimized GANTT Table Container */}
+      <div className="overflow-x-auto touch-manipulation" style={{ WebkitOverflowScrolling: 'touch' }}>
         <table className="border-collapse w-full min-w-max">
           <thead>
             <tr>
-              <th className="border border-gray-300 bg-gray-100 p-2 w-48 text-left">Tasks & Activities</th>
+              <th className="border border-gray-300 bg-gray-100 p-2 sm:p-2 w-48 sm:w-48 text-left text-xs sm:text-sm">
+                <span className="hidden sm:inline">Tasks & Activities</span>
+                <span className="sm:hidden">Tasks</span>
+              </th>
               {weeks.map((week) => (
-                <th key={week.name} colSpan={7} className="border border-gray-300 bg-gray-800 text-white p-1 text-center text-xs">
-                  {week.name}
+                <th key={week.name} colSpan={7} className="border border-gray-300 bg-gray-800 text-white p-1 sm:p-1 text-center text-xs">
+                  <span className="hidden sm:inline">{week.name}</span>
+                  <span className="sm:hidden">{week.name.split(' ')[0]}</span>
                 </th>
               ))}
-              <th className="border border-gray-300 bg-gray-100 p-2 w-16 text-center">Owner</th>
-              <th className="border border-gray-300 bg-gray-100 p-2 w-24 text-center">Progress</th>
+              <th className="border border-gray-300 bg-gray-100 p-1 sm:p-2 w-12 sm:w-16 text-center text-xs sm:text-sm">
+                <span className="hidden sm:inline">Owner</span>
+                <span className="sm:hidden">Own</span>
+              </th>
+              <th className="border border-gray-300 bg-gray-100 p-1 sm:p-2 w-16 sm:w-24 text-center text-xs sm:text-sm">
+                <span className="hidden sm:inline">Progress</span>
+                <span className="sm:hidden">%</span>
+              </th>
             </tr>
             <tr>
               <th className="border border-gray-300 bg-gray-100"></th>
               {weeks.map((week, weekIndex) => (
                 week.days.map((day) => (
-                  <th key={`${weekIndex}-${day}`} className="border border-gray-300 bg-gray-200 w-6 p-1 text-center text-xs">
-                    {day}
+                  <th key={`${weekIndex}-${day}`} className="border border-gray-300 bg-gray-200 w-6 sm:w-6 p-1 text-center text-xs min-h-[28px] sm:min-h-[auto]">
+                    <span className="hidden sm:inline">{day}</span>
+                    <span className="sm:hidden">{day.charAt(0)}</span>
                   </th>
                 ))
               ))}
@@ -1908,30 +2271,30 @@ const ThesisGanttChart = () => {
                       : ''
                   }`}
                 >
-                  <td className="border border-gray-300 bg-gray-800 text-white p-2 font-bold relative cursor-move">
-                    <div className="flex items-center justify-between group">
+                  <td className="border border-gray-300 bg-gray-800 text-white p-1 sm:p-2 font-bold relative cursor-move touch-manipulation">
+                    <div className="flex items-center justify-between group min-h-[36px] sm:min-h-[auto]">
                       {editingRow?.type === 'task' && editingRow?.id === task.id ? (
-                        <div className="flex-1 flex items-center gap-2">
+                        <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-1 sm:gap-2">
                           <input
                             ref={editInputRef}
                             type="text"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             onKeyDown={handleEditKeyPress}
-                            className="flex-1 bg-white text-gray-900 px-2 py-1 rounded text-sm font-bold"
+                            className="flex-1 bg-white text-gray-900 px-2 py-2 sm:py-1 rounded text-sm font-bold touch-manipulation"
                             maxLength={100}
                           />
                           <div className="flex gap-1">
                             <button
                               onClick={saveEdit}
-                              className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs"
+                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 sm:px-2 sm:py-1 rounded text-xs touch-manipulation min-h-[36px] sm:min-h-[auto] flex items-center justify-center"
                               title="Save (Enter)"
                             >
                               ✓
                             </button>
                             <button
                               onClick={cancelEditing}
-                              className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
+                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 sm:px-2 sm:py-1 rounded text-xs touch-manipulation min-h-[36px] sm:min-h-[auto] flex items-center justify-center"
                               title="Cancel (Escape)"
                             >
                               ✕
@@ -1940,21 +2303,23 @@ const ThesisGanttChart = () => {
                         </div>
                       ) : (
                         <>
-                          <span className="flex-1">{task.name}</span>
-                          <div className="flex gap-1">
+                          <span className="flex-1 text-xs sm:text-sm leading-tight">{task.name}</span>
+                          <div className="flex flex-col sm:flex-row gap-1 ml-2">
                             <button
                               onClick={() => startEditing('task', task.id, task.name)}
-                              className="opacity-0 group-hover:opacity-100 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs transition-opacity"
+                              className="opacity-100 sm:opacity-0 group-hover:opacity-100 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs transition-opacity touch-manipulation min-h-[32px] sm:min-h-[auto] flex items-center justify-center"
                               title="Edit task name"
                             >
-                              Edit
+                              <span className="hidden sm:inline">Edit</span>
+                              <span className="sm:hidden">✏️</span>
                             </button>
                             <button
                               onClick={() => deleteTask(task.id)}
-                              className="opacity-0 group-hover:opacity-100 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs transition-opacity"
+                              className="opacity-100 sm:opacity-0 group-hover:opacity-100 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs transition-opacity touch-manipulation min-h-[32px] sm:min-h-[auto] flex items-center justify-center"
                               title="Delete task"
                             >
-                              Delete
+                              <span className="hidden sm:inline">Delete</span>
+                              <span className="sm:hidden">🗑️</span>
                             </button>
                           </div>
                         </>
@@ -1974,30 +2339,30 @@ const ThesisGanttChart = () => {
                   
                   return (
                     <tr key={activity.id} className="transition-all duration-300 hover:bg-gray-50">
-                      <td className="border border-gray-300 p-2 text-sm relative">
-                        <div className="flex items-center justify-between group">
+                      <td className="border border-gray-300 p-1 sm:p-2 text-xs sm:text-sm relative touch-manipulation">
+                        <div className="flex items-center justify-between group min-h-[36px] sm:min-h-[auto]">
                           {editingRow?.type === 'activity' && editingRow?.id === activity.id ? (
-                            <div className="flex-1 flex items-center gap-2">
+                            <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-1 sm:gap-2">
                               <input
                                 ref={editInputRef}
                                 type="text"
                                 value={editValue}
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onKeyDown={handleEditKeyPress}
-                                className="flex-1 bg-white text-gray-900 px-2 py-1 rounded text-sm border"
+                                className="flex-1 bg-white text-gray-900 px-2 py-2 sm:py-1 rounded text-sm border touch-manipulation"
                                 maxLength={100}
                               />
                               <div className="flex gap-1">
                                 <button
                                   onClick={saveEdit}
-                                  className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs"
+                                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 sm:px-2 sm:py-1 rounded text-xs touch-manipulation min-h-[36px] sm:min-h-[auto] flex items-center justify-center"
                                   title="Save (Enter)"
                                 >
                                   ✓
                                 </button>
                                 <button
                                   onClick={cancelEditing}
-                                  className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
+                                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 sm:px-2 sm:py-1 rounded text-xs touch-manipulation min-h-[36px] sm:min-h-[auto] flex items-center justify-center"
                                   title="Cancel (Escape)"
                                 >
                                   ✕
@@ -2007,26 +2372,28 @@ const ThesisGanttChart = () => {
                           ) : (
                             <>
                               <span 
-                                className="flex-1 cursor-pointer" 
+                                className="flex-1 cursor-pointer leading-tight" 
                                 onDoubleClick={() => startEditing('activity', activity.id, activity.name)}
                                 title="Double-click to edit"
                               >
                                 {activity.name}
                               </span>
-                              <div className="flex gap-1">
+                              <div className="flex flex-col sm:flex-row gap-1 ml-2">
                                 <button
                                   onClick={() => startEditing('activity', activity.id, activity.name)}
-                                  className="opacity-0 group-hover:opacity-100 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs transition-opacity"
+                                  className="opacity-100 sm:opacity-0 group-hover:opacity-100 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs transition-opacity touch-manipulation min-h-[32px] sm:min-h-[auto] flex items-center justify-center"
                                   title="Edit activity name"
                                 >
-                                  Edit
+                                  <span className="hidden sm:inline">Edit</span>
+                                  <span className="sm:hidden">✏️</span>
                                 </button>
                                 <button
                                   onClick={() => deleteActivity(task.id, activity.id)}
-                                  className="opacity-0 group-hover:opacity-100 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs transition-opacity"
+                                  className="opacity-100 sm:opacity-0 group-hover:opacity-100 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs transition-opacity touch-manipulation min-h-[32px] sm:min-h-[auto] flex items-center justify-center"
                                   title="Delete activity"
                                 >
-                                  Delete
+                                  <span className="hidden sm:inline">Delete</span>
+                                  <span className="sm:hidden">🗑️</span>
                                 </button>
                               </div>
                             </>
@@ -2039,14 +2406,14 @@ const ThesisGanttChart = () => {
                         ))
                       ))}
                       <td className="border border-gray-300 p-1 text-center">
-                        <div className="w-8 h-8 rounded-full bg-red-100 mx-auto flex items-center justify-center text-sm">
+                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-100 mx-auto flex items-center justify-center text-xs sm:text-sm touch-manipulation">
                           {activity.owner}
                         </div>
                       </td>
-                      <td className="border border-gray-300 p-2">
-                        <div className="w-full bg-gray-200 rounded-full h-4">
+                      <td className="border border-gray-300 p-1 sm:p-2">
+                        <div className="w-full bg-gray-200 rounded-full h-3 sm:h-4 touch-manipulation">
                           <div 
-                            className={`h-4 rounded-full ${progress > 0 ? 'bg-blue-600' : 'bg-gray-300'}`}
+                            className={`h-3 sm:h-4 rounded-full ${progress > 0 ? 'bg-blue-600' : 'bg-gray-300'}`}
                             style={{ width: `${progress > 0 ? progress : 0}%` }}
                           ></div>
                         </div>
@@ -2093,6 +2460,35 @@ const ThesisGanttChart = () => {
       
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal />
+      
+      {/* File Management Components - Task 13 Integration */}
+      <FileTooltip
+        files={fileTooltip.files}
+        position={fileTooltip.position}
+        isVisible={fileTooltip.isVisible}
+        onFileClick={handleFileClick}
+        onClose={handleFileTooltipHide}
+      />
+      
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={showFilePreview}
+        onClose={handleFilePreviewClose}
+      />
+      
+      <FileSearch
+        allFiles={getAllFiles()}
+        onFileSelect={handleFileSelect}
+        onClose={() => setShowFileSearch(false)}
+        isOpen={showFileSearch}
+      />
+      
+      {/* Export Panel - Task 16 Integration */}
+      <ExportPanel
+        isOpen={showExportPanel}
+        onClose={() => setShowExportPanel(false)}
+        ganttData={tasks}
+      />
     </div>
   );
 };

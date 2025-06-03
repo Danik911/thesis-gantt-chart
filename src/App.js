@@ -1,32 +1,61 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
-import WeeklyGanttChart from './components/WeeklyGanttChart';
-import DailyProgress from './components/DailyProgress';
-import TextNotes from './components/TextNotes';
-import FileUploadPage from './components/FileUploadPage';
-import OAuthCallback from './components/OAuthCallback';
+import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
+import { RoleProvider } from './contexts/RoleContext';
+import { PERMISSIONS } from './constants/roles';
 import './App.css';
 
+// Lazy loaded components for better performance
+const WeeklyGanttChart = lazy(() => import('./components/WeeklyGanttChart'));
+const DailyProgress = lazy(() => import('./components/DailyProgress'));
+const TextNotes = lazy(() => import('./components/TextNotes'));
+const FileUploadPage = lazy(() => import('./components/FileUploadPage'));
+const GitHubFileManager = lazy(() => import('./components/GitHubFileManager'));
+const OAuthCallback = lazy(() => import('./components/OAuthCallback'));
+const PDFManager = lazy(() => import('./components/PDFManager'));
+const UserManagement = lazy(() => import('./components/UserManagement'));
+const AuditLog = lazy(() => import('./components/AuditLog'));
+
 function App() {
+  // Register service worker for offline support
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            console.log('SW registered: ', registration);
+          })
+          .catch((registrationError) => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <Router>
-          <div className="App min-h-screen bg-gray-50">
-            <Navigation />
+        <RoleProvider>
+          <Router>
+            <div className="App min-h-screen bg-gray-50 flex flex-col safe-area-top safe-area-bottom">
+              <Navigation />
             
-            <main className="transition-all duration-300">
-              <Suspense fallback={<LoadingSpinner message="Loading page..." size="large" />}>
+            <main className="flex-1 transition-all duration-300 safe-area-left safe-area-right">
+              <Suspense fallback={
+                <div className="flex items-center justify-center min-h-[60vh] px-4">
+                  <LoadingSpinner message="Loading page..." size="large" />
+                </div>
+              }>
                 <Routes>
                   <Route 
                     path="/" 
                     element={
                       <ErrorBoundary>
-                        <div className="container mx-auto p-4">
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
                           <WeeklyGanttChart />
                         </div>
                       </ErrorBoundary>
@@ -36,7 +65,9 @@ function App() {
                     path="/daily-progress" 
                     element={
                       <ErrorBoundary>
-                        <DailyProgress />
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                          <DailyProgress />
+                        </div>
                       </ErrorBoundary>
                     } 
                   />
@@ -44,7 +75,9 @@ function App() {
                     path="/text-notes" 
                     element={
                       <ErrorBoundary>
-                        <TextNotes />
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                          <TextNotes />
+                        </div>
                       </ErrorBoundary>
                     } 
                   />
@@ -52,7 +85,29 @@ function App() {
                     path="/file-upload" 
                     element={
                       <ErrorBoundary>
-                        <FileUploadPage />
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                          <FileUploadPage />
+                        </div>
+                      </ErrorBoundary>
+                    } 
+                  />
+                  <Route 
+                    path="/pdf-manager" 
+                    element={
+                      <ErrorBoundary>
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                          <PDFManager />
+                        </div>
+                      </ErrorBoundary>
+                    } 
+                  />
+                  <Route 
+                    path="/github-files" 
+                    element={
+                      <ErrorBoundary>
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                          <GitHubFileManager />
+                        </div>
                       </ErrorBoundary>
                     } 
                   />
@@ -61,7 +116,33 @@ function App() {
                     path="/auth/callback" 
                     element={
                       <ErrorBoundary>
-                        <OAuthCallback />
+                        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                          <OAuthCallback />
+                        </div>
+                      </ErrorBoundary>
+                    } 
+                  />
+                  <Route 
+                    path="/user-management" 
+                    element={
+                      <ErrorBoundary>
+                        <ProtectedRoute requiredPermissions={[PERMISSIONS.VIEW_USERS]}>
+                          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                            <UserManagement />
+                          </div>
+                        </ProtectedRoute>
+                      </ErrorBoundary>
+                    } 
+                  />
+                  <Route 
+                    path="/audit-log" 
+                    element={
+                      <ErrorBoundary>
+                        <ProtectedRoute requiredPermissions={[PERMISSIONS.VIEW_AUDIT_LOG]}>
+                          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                            <AuditLog />
+                          </div>
+                        </ProtectedRoute>
                       </ErrorBoundary>
                     } 
                   />
@@ -69,15 +150,34 @@ function App() {
                   <Route 
                     path="*" 
                     element={
-                      <div className="flex flex-col items-center justify-center h-96">
-                        <h1 className="text-4xl font-bold text-gray-800 mb-4">404</h1>
-                        <p className="text-gray-600 mb-6">Page not found</p>
-                        <a 
-                          href="/" 
-                          className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                        >
-                          Go Home
-                        </a>
+                      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 sm:px-6 lg:px-8 py-8">
+                        <div className="text-center max-w-md mx-auto">
+                          <div className="text-6xl sm:text-8xl mb-6">📋</div>
+                          <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-gray-800 mb-4">404</h1>
+                          <p className="text-gray-600 mb-8 text-base sm:text-lg leading-relaxed">
+                            Oops! The page you&rsquo;re looking for doesn&rsquo;t exist. Let&rsquo;s get you back on track.
+                          </p>
+                          <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+                            <a 
+                              href="/" 
+                              className="inline-flex items-center justify-center bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors touch-manipulation min-h-[48px] w-full sm:w-auto focus-mobile"
+                            >
+                              <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                              </svg>
+                              Go Home
+                            </a>
+                            <button 
+                              onClick={() => window.history.back()}
+                              className="inline-flex items-center justify-center bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-colors touch-manipulation min-h-[48px] w-full sm:w-auto focus-mobile"
+                            >
+                              <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                              </svg>
+                              Go Back
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     } 
                   />
@@ -86,6 +186,7 @@ function App() {
             </main>
           </div>
         </Router>
+        </RoleProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

@@ -1,17 +1,67 @@
-/* Calendar Component Styles */
+/* Calendar Component Styles - Mobile First */
+.calendar-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Mobile-optimized calendar */
+@media (max-width: 768px) {
+  .calendar-wrapper .fc-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .calendar-wrapper .fc-toolbar-chunk {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .calendar-wrapper .fc-button-group {
+    flex-wrap: wrap;
+  }
+  
+  .calendar-wrapper .fc-daygrid-event {
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+  
+  .calendar-wrapper .fc-col-header-cell {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.25rem;
+  }
+  
+  .calendar-wrapper .fc-daygrid-day-number {
+    font-size: 0.875rem;
+    padding: 0.5rem;
+  }
+}
+
+/* Touch-friendly day cells */
 .calendar-wrapper .fc-day-with-entries {
   position: relative;
+  min-height: 2.5rem;
 }
 
 .calendar-wrapper .fc-day-with-entries::after {
   content: '';
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 8px;
-  height: 8px;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 0.5rem;
+  height: 0.5rem;
   background-color: #16a34a;
   border-radius: 50%;
+}
+
+/* Enhanced mobile tap targets */
+@media (max-width: 768px) {
+  .calendar-wrapper .fc-day-with-entries::after {
+    width: 0.75rem;
+    height: 0.75rem;
+    top: 0.125rem;
+    right: 0.125rem;
+  }
 }
 
 .calendar-wrapper .fc-day-selected {
@@ -19,9 +69,14 @@
   border-color: #2563eb !important;
 }
 
+.calendar-wrapper .fc-daygrid-day {
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+  min-height: 3rem;
+}
+
 .calendar-wrapper .fc-daygrid-day:hover {
   background-color: #f3f4f6;
-  cursor: pointer;
 }
 
 .calendar-wrapper .fc-day-disabled:hover {
@@ -29,23 +84,122 @@
   cursor: not-allowed;
 }
 
+/* Mobile-optimized buttons */
 .calendar-wrapper .fc-button {
   background-color: #f3f4f6;
   border-color: #d1d5db;
   color: #374151;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
 }
 
-.calendar-wrapper .fc-button:hover {
+/* Larger tap targets for mobile */
+@media (max-width: 768px) {
+  .calendar-wrapper .fc-button {
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+  }
+  
+  .calendar-wrapper .fc-daygrid-day {
+    min-height: 4rem;
+  }
+}
+
+.calendar-wrapper .fc-button:hover:not(:disabled) {
   background-color: #e5e7eb;
   border-color: #9ca3af;
+  transform: translateY(-0.05rem);
+}
+
+.calendar-wrapper .fc-button:active {
+  transform: translateY(0);
 }
 
 .calendar-wrapper .fc-button-primary {
   background-color: #3b82f6;
   border-color: #3b82f6;
+  color: white;
+}
+
+.calendar-wrapper .fc-button-primary:hover:not(:disabled) {
+  background-color: #2563eb;
+  border-color: #2563eb;
 }
 
 .calendar-wrapper .fc-today-button {
   background-color: #16a34a;
   border-color: #16a34a;
+  color: white;
+}
+
+.calendar-wrapper .fc-today-button:hover:not(:disabled) {
+  background-color: #15803d;
+  border-color: #15803d;
+}
+
+/* Mobile swipe support */
+@media (max-width: 768px) {
+  .calendar-wrapper {
+    touch-action: pan-x;
+  }
+  
+  .calendar-wrapper .fc-daygrid-body {
+    touch-action: manipulation;
+  }
+}
+
+/* Improved mobile event display */
+@media (max-width: 768px) {
+  .calendar-wrapper .fc-event {
+    border-radius: 0.25rem;
+    margin: 0.125rem;
+    padding: 0.25rem;
+    font-weight: 500;
+  }
+  
+  .calendar-wrapper .fc-event-title {
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+}
+
+/* Responsive calendar header */
+@media (max-width: 640px) {
+  .calendar-wrapper .fc-toolbar-title {
+    font-size: 1.25rem;
+    margin: 0.5rem 0;
+  }
+  
+  .calendar-wrapper .fc-button {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+  .calendar-wrapper .fc-toolbar-title {
+    font-size: 1.125rem;
+  }
+  
+  .calendar-wrapper .fc-col-header-cell {
+    font-size: 0.75rem;
+    padding: 0.25rem;
+  }
+  
+  .calendar-wrapper .fc-daygrid-day-number {
+    font-size: 0.75rem;
+    padding: 0.25rem;
+  }
+  
+  .calendar-wrapper .fc-button {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+    min-height: 2.5rem;
+  }
 } 

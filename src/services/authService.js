@@ -1,5 +1,7 @@
 import { createOAuthAppAuth } from '@octokit/auth-oauth-app';
 import { Octokit } from '@octokit/rest';
+import securityService from './securityService';
+import encryptionService from './encryptionService';
 
 class AuthService {
   constructor() {
@@ -12,6 +14,8 @@ class AuthService {
     this.accessToken = this.getStoredToken();
     this.refreshToken = this.getStoredRefreshToken();
     this.user = null;
+    this.sessionId = securityService.generateSessionId();
+    this.csrfToken = null;
   }
 
   // Initialize OAuth app authentication
@@ -73,6 +77,9 @@ class AuthService {
       // Store tokens securely
       this.storeTokens(this.accessToken, this.refreshToken);
 
+      // Generate CSRF token for this session
+      this.csrfToken = securityService.generateCSRFToken(this.sessionId);
+
       // Initialize Octokit with the new token
       await this.initializeOctokit();
 
@@ -82,7 +89,9 @@ class AuthService {
       return {
         access_token: this.accessToken,
         refresh_token: this.refreshToken,
-        user: this.user
+        user: this.user,
+        sessionId: this.sessionId,
+        csrfToken: this.csrfToken
       };
     } catch (error) {
       console.error('Token exchange failed:', error);
@@ -209,10 +218,20 @@ class AuthService {
 
   // Logout user
   logout() {
+    // Remove CSRF token
+    if (this.csrfToken) {
+      securityService.removeCSRFToken(this.csrfToken);
+    }
+
+    // Clear encryption data
+    encryptionService.clearEncryptionData();
+
     this.accessToken = null;
     this.refreshToken = null;
     this.user = null;
     this.octokit = null;
+    this.sessionId = null;
+    this.csrfToken = null;
 
     // Clear stored data
     localStorage.removeItem('github_access_token');
@@ -322,6 +341,73 @@ class AuthService {
       }
       throw new Error(`Failed to check repository access: ${error.message}`);
     }
+  }
+
+  // Security Methods
+  // ================
+
+  /**
+   * Get current session ID
+   * @returns {string} Session ID
+   */
+  getSessionId() {
+    return this.sessionId;
+  }
+
+  /**
+   * Get current CSRF token
+   * @returns {string} CSRF token
+   */
+  getCSRFToken() {
+    return this.csrfToken;
+  }
+
+  /**
+   * Validate CSRF token
+   * @param {string} token - Token to validate
+   * @returns {boolean} True if valid
+   */
+  validateCSRFToken(token) {
+    return securityService.validateCSRFToken(token, this.sessionId);
+  }
+
+  /**
+   * Check rate limit for current user
+   * @param {number} maxRequests - Maximum requests allowed
+   * @param {number} windowMs - Time window in milliseconds
+   * @returns {object} Rate limit status
+   */
+  checkRateLimit(maxRequests, windowMs) {
+    const identifier = this.user?.id || this.sessionId || 'anonymous';
+    return securityService.checkRateLimit(identifier, maxRequests, windowMs);
+  }
+
+  /**
+   * Get user's public encryption key
+   * @returns {string} Public key
+   */
+  getPublicKey() {
+    return encryptionService.getPublicKey();
+  }
+
+  /**
+   * Encrypt data for another user
+   * @param {string} data - Data to encrypt
+   * @param {string} recipientPublicKey - Recipient's public key
+   * @returns {object} Encrypted data
+   */
+  encryptForUser(data, recipientPublicKey) {
+    return encryptionService.encryptMessage(data, recipientPublicKey);
+  }
+
+  /**
+   * Decrypt data from another user
+   * @param {object} encryptedData - Encrypted data
+   * @param {string} senderPublicKey - Sender's public key
+   * @returns {string} Decrypted data
+   */
+  decryptFromUser(encryptedData, senderPublicKey) {
+    return encryptionService.decryptMessage(encryptedData, senderPublicKey);
   }
 }
 

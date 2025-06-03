@@ -1,13 +1,41 @@
 {
   "files": {
-    "main.css": "/thesis-gantt-chart/static/css/main.ad5da37e.css",
-    "main.js": "/thesis-gantt-chart/static/js/main.14a2247e.js",
+    "main.css": "/thesis-gantt-chart/static/css/main.ce4e3436.css",
+    "main.js": "/thesis-gantt-chart/static/js/main.8c2693e7.js",
+    "static/js/940.3bc2c4d0.chunk.js": "/thesis-gantt-chart/static/js/940.3bc2c4d0.chunk.js",
+    "static/css/35.bfd04fcd.chunk.css": "/thesis-gantt-chart/static/css/35.bfd04fcd.chunk.css",
+    "static/js/35.f1e0cbe3.chunk.js": "/thesis-gantt-chart/static/js/35.f1e0cbe3.chunk.js",
+    "static/css/602.efff3526.chunk.css": "/thesis-gantt-chart/static/css/602.efff3526.chunk.css",
+    "static/js/602.8744b43d.chunk.js": "/thesis-gantt-chart/static/js/602.8744b43d.chunk.js",
+    "static/js/52.5bfd2d04.chunk.js": "/thesis-gantt-chart/static/js/52.5bfd2d04.chunk.js",
+    "static/js/317.6aa78b5e.chunk.js": "/thesis-gantt-chart/static/js/317.6aa78b5e.chunk.js",
+    "static/js/929.071999ce.chunk.js": "/thesis-gantt-chart/static/js/929.071999ce.chunk.js",
+    "static/js/907.8dc50d72.chunk.js": "/thesis-gantt-chart/static/js/907.8dc50d72.chunk.js",
+    "static/js/621.b258ef14.chunk.js": "/thesis-gantt-chart/static/js/621.b258ef14.chunk.js",
+    "static/js/918.5889dc85.chunk.js": "/thesis-gantt-chart/static/js/918.5889dc85.chunk.js",
+    "static/js/500.d1282d95.chunk.js": "/thesis-gantt-chart/static/js/500.d1282d95.chunk.js",
+    "static/css/614.9b699e57.chunk.css": "/thesis-gantt-chart/static/css/614.9b699e57.chunk.css",
+    "static/js/614.18863eb4.chunk.js": "/thesis-gantt-chart/static/js/614.18863eb4.chunk.js",
     "index.html": "/thesis-gantt-chart/index.html",
-    "main.ad5da37e.css.map": "/thesis-gantt-chart/static/css/main.ad5da37e.css.map",
-    "main.14a2247e.js.map": "/thesis-gantt-chart/static/js/main.14a2247e.js.map"
+    "main.ce4e3436.css.map": "/thesis-gantt-chart/static/css/main.ce4e3436.css.map",
+    "main.8c2693e7.js.map": "/thesis-gantt-chart/static/js/main.8c2693e7.js.map",
+    "940.3bc2c4d0.chunk.js.map": "/thesis-gantt-chart/static/js/940.3bc2c4d0.chunk.js.map",
+    "35.bfd04fcd.chunk.css.map": "/thesis-gantt-chart/static/css/35.bfd04fcd.chunk.css.map",
+    "35.f1e0cbe3.chunk.js.map": "/thesis-gantt-chart/static/js/35.f1e0cbe3.chunk.js.map",
+    "602.efff3526.chunk.css.map": "/thesis-gantt-chart/static/css/602.efff3526.chunk.css.map",
+    "602.8744b43d.chunk.js.map": "/thesis-gantt-chart/static/js/602.8744b43d.chunk.js.map",
+    "52.5bfd2d04.chunk.js.map": "/thesis-gantt-chart/static/js/52.5bfd2d04.chunk.js.map",
+    "317.6aa78b5e.chunk.js.map": "/thesis-gantt-chart/static/js/317.6aa78b5e.chunk.js.map",
+    "929.071999ce.chunk.js.map": "/thesis-gantt-chart/static/js/929.071999ce.chunk.js.map",
+    "907.8dc50d72.chunk.js.map": "/thesis-gantt-chart/static/js/907.8dc50d72.chunk.js.map",
+    "621.b258ef14.chunk.js.map": "/thesis-gantt-chart/static/js/621.b258ef14.chunk.js.map",
+    "918.5889dc85.chunk.js.map": "/thesis-gantt-chart/static/js/918.5889dc85.chunk.js.map",
+    "500.d1282d95.chunk.js.map": "/thesis-gantt-chart/static/js/500.d1282d95.chunk.js.map",
+    "614.9b699e57.chunk.css.map": "/thesis-gantt-chart/static/css/614.9b699e57.chunk.css.map",
+    "614.18863eb4.chunk.js.map": "/thesis-gantt-chart/static/js/614.18863eb4.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.ad5da37e.css",
-    "static/js/main.14a2247e.js"
+    "static/css/main.ce4e3436.css",
+    "static/js/main.8c2693e7.js"
   ]
 }

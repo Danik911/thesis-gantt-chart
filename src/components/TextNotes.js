@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Editor, EditorState, RichUtils, convertToRaw, convertFromRaw, getDefaultKeyBinding, KeyBindingUtil } from 'draft-js';
+import { Editor, EditorState, RichUtils, convertToRaw, convertFromRaw } from 'draft-js';
 import { stateToHTML } from 'draft-js-export-html';
 import { stateFromHTML } from 'draft-js-import-html';
 import ReactMarkdown from 'react-markdown';
@@ -15,7 +15,6 @@ const TextNotes = () => {
   const [selectedTags, setSelectedTags] = useState([]);
   const [newTag, setNewTag] = useState('');
   const [noteTitle, setNoteTitle] = useState('');
-  const [viewMode, setViewMode] = useState('editor'); // 'editor', 'preview', 'split'
   const [autoSaveStatus, setAutoSaveStatus] = useState('saved');
   const [isMarkdownMode, setIsMarkdownMode] = useState(false);
   const [markdownContent, setMarkdownContent] = useState('');
@@ -34,7 +33,10 @@ const TextNotes = () => {
       try {
         setNotes(JSON.parse(savedNotes));
       } catch (error) {
-        console.error('Error loading notes:', error);
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.error('Error loading notes:', error);
+        }
       }
     }
     
@@ -42,7 +44,10 @@ const TextNotes = () => {
       try {
         setTags(JSON.parse(savedTags));
       } catch (error) {
-        console.error('Error loading tags:', error);
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.error('Error loading tags:', error);
+        }
       }
     }
     
@@ -50,7 +55,10 @@ const TextNotes = () => {
       try {
         setFolders(JSON.parse(savedFolders));
       } catch (error) {
-        console.error('Error loading folders:', error);
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.error('Error loading folders:', error);
+        }
       }
     }
   }, []);
@@ -66,7 +74,7 @@ const TextNotes = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [editorState, noteTitle, selectedTags, selectedFolder, markdownContent]);
+  }, [editorState, noteTitle, selectedTags, selectedFolder, markdownContent, currentNote, saveCurrentNote]);
 
   // Character and word count
   const { characterCount, wordCount } = useMemo(() => {
@@ -138,7 +146,10 @@ const TextNotes = () => {
         const contentState = convertFromRaw(note.content);
         setEditorState(EditorState.createWithContent(contentState));
       } catch (error) {
-        console.error('Error loading note content:', error);
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.error('Error loading note content:', error);
+        }
         setEditorState(EditorState.createEmpty());
       }
     }

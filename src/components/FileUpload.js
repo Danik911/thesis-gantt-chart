@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import Uppy from '@uppy/core';
 import { Dashboard } from '@uppy/react';
-import DragDrop from '@uppy/drag-drop';
-import FileInput from '@uppy/file-input';
-import ProgressBar from '@uppy/progress-bar';
-import StatusBar from '@uppy/status-bar';
 import XHRUpload from '@uppy/xhr-upload';
 
 // Import Uppy CSS
@@ -49,7 +46,7 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
 
     // File type and size validation
     uppyInstance.addPreProcessor((fileIDs) => {
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         const errors = [];
         
         fileIDs.forEach(fileID => {
@@ -102,21 +99,36 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
 
     // Event listeners
     uppyInstance.on('file-added', (file) => {
-      console.log('File added:', file);
+      // File added successfully
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log('File added:', file);
+      }
       // Clear previous errors when new files are added
       setUploadErrors([]);
     });
 
     uppyInstance.on('file-removed', (file) => {
-      console.log('File removed:', file);
+      // File removed
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log('File removed:', file);
+      }
     });
 
     uppyInstance.on('upload-progress', (file, progress) => {
-      console.log('Upload progress:', file.name, progress);
+      // Upload progress updated
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log('Upload progress:', file.name, progress);
+      }
     });
 
     uppyInstance.on('upload-success', (file, response) => {
-      console.log('Upload success:', file, response);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log('Upload success:', file, response);
+      }
       setUploadedFiles(prev => [...prev, { file, response }]);
       
       if (onUploadComplete) {
@@ -125,7 +137,11 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
     });
 
     uppyInstance.on('upload-error', (file, error, response) => {
-      console.error('Upload error:', file, error, response);
+      // Log error in development only
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error('Upload error:', file, error, response);
+      }
       const errorMessage = `Failed to upload ${file.name}: ${error.message || 'Unknown error'}`;
       setUploadErrors(prev => [...prev, errorMessage]);
       
@@ -135,7 +151,10 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
     });
 
     uppyInstance.on('complete', (result) => {
-      console.log('Upload complete:', result);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log('Upload complete:', result);
+      }
     });
 
     setUppy(uppyInstance);
@@ -321,6 +340,12 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
       </div>
     </div>
   );
+};
+
+FileUpload.propTypes = {
+  onUploadComplete: PropTypes.func,
+  onUploadError: PropTypes.func,
+  maxFiles: PropTypes.number
 };
 
 export default FileUpload; 

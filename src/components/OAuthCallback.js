@@ -45,7 +45,11 @@ const OAuthCallback = () => {
         navigate(redirectTo, { replace: true });
 
       } catch (error) {
-        console.error('OAuth callback processing failed:', error);
+        // Log error in development only
+        if (process.env.NODE_ENV === 'development') {
+          // eslint-disable-next-line no-console
+          console.error('OAuth callback processing failed:', error);
+        }
         setError(error.message);
         setIsProcessing(false);
       }
