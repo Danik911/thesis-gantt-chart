@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
+# Add permissions for the GITHUB_TOKEN
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -65,4 +71,3 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./build
-        cname: # Leave empty unless you have a custom domain
