@@ -1,6 +1,6 @@
 // jest-dom adds custom jest matchers for asserting on DOM nodes.
 import '@testing-library/jest-dom';
-import 'jest-axe/extend-expect';
+// Note: jest-axe removed due to missing dependency - can be added back if needed for accessibility testing
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
@@ -104,4 +104,4 @@ afterEach(() => {
   sessionStorageMock.setItem.mockClear();
   sessionStorageMock.removeItem.mockClear();
   sessionStorageMock.clear.mockClear();
-}); 
+});
