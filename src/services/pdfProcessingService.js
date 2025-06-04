@@ -1,5 +1,5 @@
 // PDF processing service with PDF.js support
-import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsLib from '../utils/pdfConfig';
 
 class PDFProcessingService {
   constructor() {
@@ -11,9 +11,6 @@ class PDFProcessingService {
     this.readingProgress = new Map();
     this.maxCacheSize = 50;
     this.cacheExpiryTime = 30 * 60 * 1000; // 30 minutes
-    
-    // Configure PDF.js worker with explicit HTTPS protocol
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.7.107/pdf.worker.min.js`;
     
     this.defaultOptions = {
       thumbnailWidth: 200,
@@ -27,19 +24,21 @@ class PDFProcessingService {
   // Cache management
   getCachedData(key) {
     const now = Date.now();
-    const expiry = this.cacheExpiry.get(key);
-    
-    if (expiry && now > expiry) {
-      this.cache.delete(key);
-      this.cacheExpiry.delete(key);
-      return null;
+    if (this.cache.has(key) && this.cacheExpiry.get(key) > now) {
+      return this.cache.get(key);
     }
     
-    return this.cache.get(key);
+    // Remove expired entry
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+      this.cacheExpiry.delete(key);
+    }
+    
+    return null;
   }
 
   setCachedData(key, data) {
-    // Implement LRU cache eviction
+    // Implement LRU eviction if cache is full
     if (this.cache.size >= this.maxCacheSize) {
       const firstKey = this.cache.keys().next().value;
       this.cache.delete(firstKey);
@@ -50,429 +49,342 @@ class PDFProcessingService {
     this.cacheExpiry.set(key, Date.now() + this.cacheExpiryTime);
   }
 
-  // Clear cache
   clearCache() {
     this.cache.clear();
     this.cacheExpiry.clear();
-    this.annotations.clear();
-    this.readingProgress.clear();
+  }
+
+  // File validation
+  isValidPDFFile(file) {
+    return file && 
+           file.type === 'application/pdf' && 
+           file.size > 0 && 
+           file.size < 50 * 1024 * 1024; // 50MB limit
+  }
+
+  // Generate unique file ID
+  generateFileId(file) {
+    return `pdf_${file.name}_${file.size}_${file.lastModified || Date.now()}`;
+  }
+
+  // Main PDF processing function
+  async processPDFFile(file, options = {}) {
+    const opts = { ...this.defaultOptions, ...options };
+    const fileId = this.generateFileId(file);
+    
+    try {
+      // Check if already processed
+      if (this.processedFiles.has(fileId)) {
+        return this.processedFiles.get(fileId);
+      }
+
+      // Validate file
+      if (!this.isValidPDFFile(file)) {
+        throw new Error('Invalid PDF file or file too large (max 50MB)');
+      }
+
+      this.updateProgress(fileId, 0, 'Starting PDF processing...');
+
+      // Load PDF document
+      const arrayBuffer = await file.arrayBuffer();
+      this.updateProgress(fileId, 20, 'Loading PDF document...');
+      
+      const pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+      this.updateProgress(fileId, 40, 'Extracting metadata...');
+
+      // Extract basic information
+      const numPages = pdfDoc.numPages;
+      
+      // Extract metadata
+      let metadata = {};
+      try {
+        const pdfMetadata = await pdfDoc.getMetadata();
+        metadata = {
+          title: pdfMetadata.info?.Title || file.name,
+          author: pdfMetadata.info?.Author || 'Unknown',
+          subject: pdfMetadata.info?.Subject || '',
+          creator: pdfMetadata.info?.Creator || '',
+          creationDate: pdfMetadata.info?.CreationDate || null,
+          modificationDate: pdfMetadata.info?.ModDate || null,
+          keywords: pdfMetadata.info?.Keywords || ''
+        };
+      } catch (metaError) {
+        console.warn('Could not extract PDF metadata:', metaError);
+      }
+
+      this.updateProgress(fileId, 60, 'Generating thumbnail...');
+
+      // Generate thumbnail from first page
+      let thumbnail = null;
+      try {
+        const page = await pdfDoc.getPage(1);
+        const viewport = page.getViewport({ scale: 1 });
+        
+        // Calculate scale to fit thumbnail dimensions
+        const scale = Math.min(
+          opts.thumbnailWidth / viewport.width,
+          opts.thumbnailHeight / viewport.height
+        );
+        
+        const scaledViewport = page.getViewport({ scale });
+        
+        // Create canvas for thumbnail
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = scaledViewport.height;
+        canvas.width = scaledViewport.width;
+
+        // Render page to canvas
+        await page.render({
+          canvasContext: context,
+          viewport: scaledViewport
+        }).promise;
+
+        thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+      } catch (thumbError) {
+        console.warn('Could not generate thumbnail:', thumbError);
+      }
+
+      this.updateProgress(fileId, 80, 'Extracting text content...');
+
+      // Extract text from first few pages for search
+      let extractedText = '';
+      const pagesToExtract = Math.min(numPages, 5); // Extract from first 5 pages
+      
+      try {
+        for (let pageNum = 1; pageNum <= pagesToExtract; pageNum++) {
+          const page = await pdfDoc.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map(item => item.str)
+            .join(' ');
+          extractedText += pageText + ' ';
+          
+          if (extractedText.length > opts.maxTextLength) {
+            extractedText = extractedText.substring(0, opts.maxTextLength);
+            break;
+          }
+        }
+      } catch (textError) {
+        console.warn('Could not extract text:', textError);
+      }
+
+      this.updateProgress(fileId, 95, 'Finalizing...');
+
+      // Create result object
+      const result = {
+        success: true,
+        fileId,
+        file: {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified
+        },
+        metadata,
+        pageCount: numPages,
+        thumbnail,
+        text: extractedText.trim(),
+        processedAt: new Date().toISOString(),
+        processingTime: Date.now() - (this.progressCallbacks.get(fileId)?.startTime || Date.now())
+      };
+
+      // Store result
+      this.processedFiles.set(fileId, result);
+      
+      if (opts.enableProgressTracking) {
+        this.readingProgress.set(fileId, {
+          currentPage: 1,
+          totalPages: numPages,
+          lastViewed: new Date().toISOString()
+        });
+      }
+
+      this.updateProgress(fileId, 100, 'Processing complete');
+      
+      return result;
+
+    } catch (error) {
+      console.error('PDF processing error:', error);
+      const errorResult = {
+        success: false,
+        fileId,
+        error: error.message,
+        processedAt: new Date().toISOString()
+      };
+      
+      this.processedFiles.set(fileId, errorResult);
+      this.updateProgress(fileId, 0, `Error: ${error.message}`);
+      
+      return errorResult;
+    }
   }
 
   // Progress tracking
-  registerProgressCallback(fileId, callback) {
-    this.progressCallbacks.set(fileId, callback);
-  }
-
-  updateProgress(fileId, progress) {
+  updateProgress(fileId, percentage, message) {
     const callback = this.progressCallbacks.get(fileId);
     if (callback) {
-      callback(progress);
+      callback({ fileId, percentage, message, timestamp: Date.now() });
     }
   }
 
-  // Extract metadata from PDF file
-  async extractMetadata(file) {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-      const metadata = await pdf.getMetadata();
-      
-      return {
-        title: metadata.info?.Title || file.name,
-        author: metadata.info?.Author || 'Unknown Author',
-        subject: metadata.info?.Subject || '',
-        keywords: metadata.info?.Keywords || '',
-        creator: metadata.info?.Creator || '',
-        producer: metadata.info?.Producer || '',
-        creationDate: metadata.info?.CreationDate || null,
-        modificationDate: metadata.info?.ModDate || null,
-        pages: pdf.numPages,
-        version: metadata.info?.PDFFormatVersion || '1.4',
-        fileSize: file.size,
-        lastModified: file.lastModified,
-        encrypted: metadata.info?.IsEncrypted || false,
-        linearized: metadata.info?.IsLinearized || false
-      };
-    } catch (error) {
-      console.error('Error extracting PDF metadata:', error);
-      return {
-        title: file.name,
-        author: 'Unknown Author',
-        subject: '',
-        keywords: '',
-        creator: '',
-        producer: '',
-        creationDate: null,
-        modificationDate: null,
-        pages: 0,
-        version: '1.4',
-        fileSize: file.size,
-        lastModified: file.lastModified,
-        encrypted: false,
-        linearized: false
-      };
-    }
+  setProgressCallback(fileId, callback) {
+    this.progressCallbacks.set(fileId, { 
+      ...callback, 
+      startTime: Date.now() 
+    });
   }
 
-  // Generate PDF thumbnail
-  async generateThumbnail(file, pageNumber = 1, options = {}) {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-      const page = await pdf.getPage(pageNumber);
-      
-      const viewport = page.getViewport({ scale: 1 });
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      
-      // Calculate scale to fit desired dimensions
-      const { thumbnailWidth = 200, thumbnailHeight = 280 } = { ...this.defaultOptions, ...options };
-      const scaleX = thumbnailWidth / viewport.width;
-      const scaleY = thumbnailHeight / viewport.height;
-      const scale = Math.min(scaleX, scaleY);
-      
-      const scaledViewport = page.getViewport({ scale });
-      canvas.width = scaledViewport.width;
-      canvas.height = scaledViewport.height;
-      
-      await page.render({
-        canvasContext: context,
-        viewport: scaledViewport
-      }).promise;
-      
-      return canvas.toDataURL('image/png');
-    } catch (error) {
-      console.error('Error generating PDF thumbnail:', error);
-      return null;
-    }
+  removeProgressCallback(fileId) {
+    this.progressCallbacks.delete(fileId);
   }
 
-  // Extract text content
-  async extractTextContent(file, maxPages = null, progressCallback = null) {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-      const totalPages = pdf.numPages;
-      const pagesToExtract = maxPages ? Math.min(maxPages, totalPages) : totalPages;
+  // Search functionality
+  searchInPDF(fileId, query, options = {}) {
+    const processed = this.processedFiles.get(fileId);
+    if (!processed || !processed.success) {
+      return { results: [], total: 0 };
+    }
+
+    const { caseSensitive = false, wholeWord = false } = options;
+    const searchText = caseSensitive ? processed.text : processed.text.toLowerCase();
+    const searchQuery = caseSensitive ? query : query.toLowerCase();
+    
+    const results = [];
+    let index = 0;
+    
+    while (index < searchText.length) {
+      let foundIndex;
       
-      const pageTexts = [];
-      let fullText = '';
-      
-      for (let i = 1; i <= pagesToExtract; i++) {
-        try {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items
-            .filter(item => item.str && item.str.trim())
-            .map(item => item.str)
-            .join(' ');
-          
-          pageTexts.push(pageText);
-          fullText += pageText + '\n';
-          
-          if (progressCallback) {
-            progressCallback({
-              page: i,
-              totalPages: pagesToExtract,
-              progress: (i / pagesToExtract) * 100
-            });
-          }
-        } catch (pageError) {
-          console.error(`Error extracting text from page ${i}:`, pageError);
-          pageTexts.push('');
+      if (wholeWord) {
+        const regex = new RegExp(`\\b${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 
+                                 caseSensitive ? 'g' : 'gi');
+        const match = regex.exec(searchText.substring(index));
+        if (match) {
+          foundIndex = index + match.index;
+        } else {
+          break;
         }
+      } else {
+        foundIndex = searchText.indexOf(searchQuery, index);
+        if (foundIndex === -1) break;
       }
       
-      return {
-        fullText: fullText.trim(),
-        pageTexts,
-        totalPages,
-        extractedPages: pagesToExtract
-      };
-    } catch (error) {
-      console.error('Error extracting PDF text content:', error);
-      return {
-        fullText: '',
-        pageTexts: [],
-        totalPages: 0,
-        extractedPages: 0
-      };
-    }
-  }
-
-  // Extract PDF outline
-  async extractOutline(file) {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-      const outline = await pdf.getOutline();
+      // Extract context around the match
+      const contextStart = Math.max(0, foundIndex - 50);
+      const contextEnd = Math.min(searchText.length, foundIndex + searchQuery.length + 50);
+      const context = processed.text.substring(contextStart, contextEnd);
       
-      return {
-        hasOutline: outline && outline.length > 0,
-        outline: outline
-      };
-    } catch (error) {
-      console.error('Error extracting PDF outline:', error);
-      return {
-        hasOutline: false,
-        outline: null
-      };
-    }
-  }
-
-  // Process PDF file comprehensively
-  async processPDFFile(file, options = {}) {
-    try {
-      const fileId = `${file.name}_${Date.now()}`;
-      const mergedOptions = { ...this.defaultOptions, ...options };
-      
-      // Register progress callback if provided
-      if (mergedOptions.enableProgressTracking && options.progressCallback) {
-        this.registerProgressCallback(fileId, options.progressCallback);
-      }
-      
-      this.updateProgress(fileId, { stage: 'Extracting metadata', progress: 10 });
-      const metadata = await this.extractMetadata(file);
-      
-      this.updateProgress(fileId, { stage: 'Generating thumbnail', progress: 30 });
-      const thumbnail = await this.generateThumbnail(file, 1, mergedOptions);
-      
-      this.updateProgress(fileId, { stage: 'Extracting text content', progress: 50 });
-      const textContent = await this.extractTextContent(file, null, (progress) => {
-        this.updateProgress(fileId, { 
-          stage: `Extracting text (page ${progress.page}/${progress.totalPages})`, 
-          progress: 50 + (progress.progress * 0.3) 
-        });
+      results.push({
+        index: foundIndex,
+        context: context,
+        beforeMatch: context.substring(0, foundIndex - contextStart),
+        match: context.substring(foundIndex - contextStart, foundIndex - contextStart + searchQuery.length),
+        afterMatch: context.substring(foundIndex - contextStart + searchQuery.length)
       });
       
-      this.updateProgress(fileId, { stage: 'Extracting outline', progress: 80 });
-      const outline = await this.extractOutline(file);
-      
-      this.updateProgress(fileId, { stage: 'Finalizing', progress: 90 });
-      
-      const result = {
-        success: true,
-        originalFile: file,
-        fileId,
-        metadata,
-        thumbnail,
-        textContent,
-        outline,
-        processed: true,
-        timestamp: new Date().toISOString()
-      };
-      
-      // Cache the result
-      const cacheKey = `${file.name}_${file.size}`;
-      this.setCachedData(cacheKey, result);
-      this.processedFiles.set(fileId, result);
-      
-      this.updateProgress(fileId, { stage: 'Complete', progress: 100 });
-      
-      return result;
-    } catch (error) {
-      console.error('Error processing PDF file:', error);
-      return this.createFallbackResult(file, error);
+      index = foundIndex + searchQuery.length;
     }
+
+    return {
+      results,
+      total: results.length,
+      query,
+      fileId
+    };
   }
 
   // Annotation management
-  addAnnotation(fileId, annotation) {
-    try {
-      if (!this.annotations.has(fileId)) {
-        this.annotations.set(fileId, new Map());
-      }
-      
-      const annotationId = Date.now().toString();
-      const fullAnnotation = {
-        id: annotationId,
-        ...annotation,
-        timestamp: new Date().toISOString()
-      };
-      
-      this.annotations.get(fileId).set(annotationId, fullAnnotation);
-      return annotationId;
-    } catch (error) {
-      console.error('Error adding annotation:', error);
-      return null;
+  addAnnotation(fileId, pageNumber, annotation) {
+    if (!this.annotations.has(fileId)) {
+      this.annotations.set(fileId, new Map());
     }
+    
+    const fileAnnotations = this.annotations.get(fileId);
+    if (!fileAnnotations.has(pageNumber)) {
+      fileAnnotations.set(pageNumber, []);
+    }
+    
+    const pageAnnotations = fileAnnotations.get(pageNumber);
+    annotation.id = `ann_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    annotation.createdAt = new Date().toISOString();
+    
+    pageAnnotations.push(annotation);
+    return annotation.id;
   }
 
-  getAnnotations(fileId) {
-    try {
-      const fileAnnotations = this.annotations.get(fileId);
-      return fileAnnotations ? Array.from(fileAnnotations.values()) : [];
-    } catch (error) {
-      console.error('Error getting annotations:', error);
-      return [];
+  getAnnotations(fileId, pageNumber = null) {
+    const fileAnnotations = this.annotations.get(fileId);
+    if (!fileAnnotations) return [];
+    
+    if (pageNumber !== null) {
+      return fileAnnotations.get(pageNumber) || [];
     }
+    
+    // Return all annotations for all pages
+    const allAnnotations = [];
+    for (const [page, annotations] of fileAnnotations) {
+      allAnnotations.push(...annotations.map(ann => ({ ...ann, pageNumber: page })));
+    }
+    return allAnnotations;
   }
 
-  updateAnnotation(fileId, annotationId, updates) {
-    try {
-      const fileAnnotations = this.annotations.get(fileId);
-      if (!fileAnnotations || !fileAnnotations.has(annotationId)) {
-        return false;
+  removeAnnotation(fileId, annotationId) {
+    const fileAnnotations = this.annotations.get(fileId);
+    if (!fileAnnotations) return false;
+    
+    for (const [pageNumber, annotations] of fileAnnotations) {
+      const index = annotations.findIndex(ann => ann.id === annotationId);
+      if (index !== -1) {
+        annotations.splice(index, 1);
+        return true;
       }
-      
-      const existingAnnotation = fileAnnotations.get(annotationId);
-      const updatedAnnotation = {
-        ...existingAnnotation,
-        ...updates,
-        lastModified: new Date().toISOString()
-      };
-      
-      fileAnnotations.set(annotationId, updatedAnnotation);
-      return true;
-    } catch (error) {
-      console.error('Error updating annotation:', error);
-      return false;
     }
-  }
-
-  deleteAnnotation(fileId, annotationId) {
-    try {
-      const fileAnnotations = this.annotations.get(fileId);
-      if (!fileAnnotations) {
-        return false;
-      }
-      
-      return fileAnnotations.delete(annotationId);
-    } catch (error) {
-      console.error('Error deleting annotation:', error);
-      return false;
-    }
+    return false;
   }
 
   // Reading progress tracking
-  updateReadingProgress(fileId, progress) {
-    this.readingProgress.set(fileId, progress);
-  }
-
-  getReadingProgress(fileId) {
-    return { progress: this.readingProgress.get(fileId) || 0 };
-  }
-
-  // Create fallback result when processing fails
-  createFallbackResult(file, error) {
-    return {
-      success: false,
-      originalFile: file,
-      error: error.message,
-      fallback: true,
-      originalUrl: URL.createObjectURL(file),
-      processed: false,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  // Get processing status
-  getProcessingStatus(fileId) {
-    return {
-      inProgress: this.progressCallbacks.has(fileId),
-      cached: this.processedFiles.has(fileId)
-    };
-  }
-
-  // Cleanup resources
-  cleanup() {
-    this.clearCache();
-    this.progressCallbacks.clear();
-    this.processedFiles.clear();
-  }
-
-  // Validate PDF file
-  isValidPDFFile(file) {
-    const validTypes = ['application/pdf'];
-    return validTypes.includes(file.type.toLowerCase()) || 
-           file.name.toLowerCase().endsWith('.pdf');
-  }
-
-  // Get cache statistics
-  getCacheStats() {
-    return {
-      size: this.cache.size,
-      maxSize: this.maxCacheSize,
-      entries: Array.from(this.cache.keys()),
-      expiryTime: this.cacheExpiryTime
-    };
-  }
-
-  // Search in PDF
-  searchInPDF(fileId, query, options = {}) {
-    try {
-      const processedData = this.processedFiles.get(fileId);
-      if (!processedData || !processedData.textContent) {
-        return {
-          query: query,
-          results: [],
-          totalMatches: 0,
-          caseSensitive: options.caseSensitive || false,
-          wholeWord: options.wholeWord || false
-        };
-      }
-
-      const { caseSensitive = false, wholeWord = false } = options;
-      const searchQuery = caseSensitive ? query : query.toLowerCase();
-      const results = [];
-      let totalMatches = 0;
-
-      processedData.textContent.pageTexts.forEach((pageText, pageIndex) => {
-        const searchText = caseSensitive ? pageText : pageText.toLowerCase();
-        
-        if (wholeWord) {
-          const regex = new RegExp(`\\b${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, caseSensitive ? 'g' : 'gi');
-          let match;
-          while ((match = regex.exec(searchText)) !== null) {
-            results.push({
-              page: pageIndex + 1,
-              position: match.index,
-              context: this.extractContext(pageText, match.index, searchQuery.length)
-            });
-            totalMatches++;
-          }
-        } else {
-          let index = searchText.indexOf(searchQuery);
-          while (index !== -1) {
-            results.push({
-              page: pageIndex + 1,
-              position: index,
-              context: this.extractContext(pageText, index, searchQuery.length)
-            });
-            totalMatches++;
-            index = searchText.indexOf(searchQuery, index + 1);
-          }
-        }
-      });
-
-      return {
-        query: query,
-        results,
-        totalMatches,
-        caseSensitive,
-        wholeWord
-      };
-    } catch (error) {
-      console.error('Error searching in PDF:', error);
-      return {
-        query: query,
-        results: [],
-        totalMatches: 0,
-        caseSensitive: options.caseSensitive || false,
-        wholeWord: options.wholeWord || false
-      };
+  updateReadingProgress(fileId, pageNumber) {
+    const progress = this.readingProgress.get(fileId);
+    if (progress) {
+      progress.currentPage = pageNumber;
+      progress.lastViewed = new Date().toISOString();
     }
   }
 
-  // Extract context around search matches
-  extractContext(text, position, matchLength, contextSize = 50) {
-    const start = Math.max(0, position - contextSize);
-    const end = Math.min(text.length, position + matchLength + contextSize);
-    return text.substring(start, end);
+  getReadingProgress(fileId) {
+    return this.readingProgress.get(fileId) || null;
+  }
+
+  // Utility methods
+  getProcessedFile(fileId) {
+    return this.processedFiles.get(fileId) || null;
+  }
+
+  getAllProcessedFiles() {
+    return Array.from(this.processedFiles.values());
+  }
+
+  removeProcessedFile(fileId) {
+    this.processedFiles.delete(fileId);
+    this.annotations.delete(fileId);
+    this.readingProgress.delete(fileId);
+    this.progressCallbacks.delete(fileId);
+  }
+
+  getStats() {
+    return {
+      processedFiles: this.processedFiles.size,
+      cacheSize: this.cache.size,
+      totalAnnotations: Array.from(this.annotations.values())
+        .reduce((total, fileAnns) => {
+          return total + Array.from(fileAnns.values())
+            .reduce((fileTotal, pageAnns) => fileTotal + pageAnns.length, 0);
+        }, 0)
+    };
   }
 }
 
-// Create singleton instance
+// Export a singleton instance
 const pdfProcessingService = new PDFProcessingService();
-
 export default pdfProcessingService;
