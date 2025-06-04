@@ -56,6 +56,9 @@ jobs:
       run: npm run build
       env:
         CI: false
+        REACT_APP_GITHUB_CLIENT_ID: ${{ secrets.REACT_APP_GITHUB_CLIENT_ID }}
+        REACT_APP_GITHUB_CLIENT_SECRET: ${{ secrets.REACT_APP_GITHUB_CLIENT_SECRET }}
+        REACT_APP_GITHUB_REDIRECT_URI: ${{ secrets.REACT_APP_GITHUB_REDIRECT_URI }}
     
     - name: Setup Pages
       uses: actions/configure-pages@v4
@@ -95,3 +98,6 @@ jobs:
       run: npm run build
       env:
         CI: false
+        REACT_APP_GITHUB_CLIENT_ID: ${{ secrets.REACT_APP_GITHUB_CLIENT_ID }}
+        REACT_APP_GITHUB_CLIENT_SECRET: ${{ secrets.REACT_APP_GITHUB_CLIENT_SECRET }}
+        REACT_APP_GITHUB_REDIRECT_URI: ${{ secrets.REACT_APP_GITHUB_REDIRECT_URI }}
