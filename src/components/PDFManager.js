@@ -79,9 +79,9 @@ const PDFManager = ({
       setPdfFiles(pdfFiles);
       console.log('PDFManager: PDF files loaded successfully:', pdfFiles.length);
       
-      // Load notes count for each file
-      await loadNotesCount(pdfFiles);
-      console.log('PDFManager: Notes count loaded');
+      // Load notes count for each file with proper error handling
+      await loadNotesCountSafely(pdfFiles);
+      console.log('PDFManager: Notes count loading completed');
     } catch (error) {
       console.error('PDFManager: Error loading stored files:', error);
       setInitError(error.message);
@@ -90,6 +90,27 @@ const PDFManager = ({
     } finally {
       setLoadingFiles(false);
       console.log('PDFManager: Finished loading stored files');
+    }
+  };
+
+  const loadNotesCountSafely = async (files) => {
+    try {
+      // Add timeout to prevent hanging on notes service
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Notes loading timeout')), 5000)
+      );
+      
+      const notesPromise = loadNotesCount(files);
+      
+      await Promise.race([notesPromise, timeoutPromise]);
+    } catch (error) {
+      console.warn('PDFManager: Failed to load notes count, continuing without notes:', error.message);
+      // Set empty notes count for all files on error
+      const counts = new Map();
+      for (const file of files) {
+        counts.set(file.storedId || file.name, 0);
+      }
+      setNotesCount(counts);
     }
   };
 
@@ -222,8 +243,12 @@ const PDFManager = ({
     try {
       if (file.storedId) {
         await fileStorageService.deleteFile(file.storedId);
-        // Also delete associated notes
-        await notesService.deleteNotesForFile(file.storedId);
+        // Also delete associated notes (but don't let it block the deletion)
+        try {
+          await notesService.deleteNotesForFile(file.storedId);
+        } catch (notesError) {
+          console.warn('Failed to delete notes for file, but file deleted successfully:', notesError);
+        }
         await loadStoredFiles(); // Refresh the list
       }
       
@@ -241,7 +266,11 @@ const PDFManager = ({
 
   const handleNotesChanged = async () => {
     // Reload notes count when notes are added/updated/deleted
-    await loadNotesCount(pdfFiles);
+    try {
+      await loadNotesCountSafely(pdfFiles);
+    } catch (error) {
+      console.warn('Failed to reload notes count:', error);
+    }
   };
 
   const openNotesPanel = (file) => {
