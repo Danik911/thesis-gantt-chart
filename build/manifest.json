@@ -7,18 +7,6 @@
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
-    },
-    {
-      "src": "logo192.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo512.png",
-      "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
@@ -36,21 +24,21 @@
       "short_name": "GANTT",
       "description": "View project timeline",
       "url": "/",
-      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "favicon.ico", "sizes": "32x32" }]
     },
     {
       "name": "Daily Progress",
       "short_name": "Progress",
       "description": "Track daily tasks",
       "url": "/daily-progress",
-      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "favicon.ico", "sizes": "32x32" }]
     },
     {
       "name": "File Upload",
       "short_name": "Files",
       "description": "Upload documents",
       "url": "/file-upload",
-      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "favicon.ico", "sizes": "32x32" }]
     }
   ],
   "screenshots": [

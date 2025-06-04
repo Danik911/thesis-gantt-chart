@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import Uppy from '@uppy/core';
 import { Dashboard } from '@uppy/react';
-import XHRUpload from '@uppy/xhr-upload';
+import ClientStorageUpload from '../utils/ClientStorageUpload';
 
 // Import Uppy CSS
 import '@uppy/core/dist/style.css';
@@ -84,17 +84,11 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
       });
     });
 
-    // Configure XHR Upload (you'll need to replace with your actual upload endpoint)
-    uppyInstance.use(XHRUpload, {
-      endpoint: '/api/upload', // Replace with your actual upload endpoint
-      method: 'POST',
-      formData: true,
-      fieldName: 'files',
+    // Configure Client Storage Upload (stores files locally in browser)
+    uppyInstance.use(ClientStorageUpload, {
       limit: 3, // Number of concurrent uploads
       timeout: 30000, // 30 seconds timeout
-      headers: {
-        // Add any required headers here
-      }
+      simulateProgress: true // Show realistic upload progress
     });
 
     // Event listeners

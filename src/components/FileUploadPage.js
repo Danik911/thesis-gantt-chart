@@ -1,9 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FileUpload from './FileUpload';
+import fileStorageService from '../services/FileStorageService';
 
 const FileUploadPage = () => {
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [uploadErrors, setUploadErrors] = useState([]);
+  const [uploadStats, setUploadStats] = useState({ successful: 0, failed: 0, total: 0 });
+  const [recentActivity, setRecentActivity] = useState([]);
+
+  // Load statistics and activity on component mount
+  useEffect(() => {
+    loadStats();
+    loadActivity();
+  }, []);
+
+  const loadStats = () => {
+    const stats = fileStorageService.getUploadStats();
+    setUploadStats(stats);
+  };
+
+  const loadActivity = () => {
+    const activity = fileStorageService.getRecentActivity();
+    setRecentActivity(activity);
+  };
 
   const handleUploadComplete = (file, response) => {
     // Upload completed successfully
@@ -11,7 +28,9 @@ const FileUploadPage = () => {
       // eslint-disable-next-line no-console
       console.log('Upload completed:', file.name, response);
     }
-    setUploadedFiles(prev => [...prev, { file, response, timestamp: new Date() }]);
+    // Refresh stats and activity from storage service
+    loadStats();
+    loadActivity();
   };
 
   const handleUploadError = (file, error) => {
@@ -20,16 +39,15 @@ const FileUploadPage = () => {
       // eslint-disable-next-line no-console
       console.error('Upload failed:', file.name, error);
     }
-    setUploadErrors(prev => [...prev, { 
-      filename: file.name, 
-      error: error.message || 'Unknown error',
-      timestamp: new Date()
-    }]);
+    // Refresh stats and activity from storage service
+    loadStats();
+    loadActivity();
   };
 
   const clearHistory = () => {
-    setUploadedFiles([]);
-    setUploadErrors([]);
+    fileStorageService.clearHistory();
+    loadStats();
+    loadActivity();
   };
 
   return (
@@ -67,18 +85,18 @@ const FileUploadPage = () => {
             <div className="space-y-3 sm:space-y-4">
               <div className="flex justify-between items-center p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200 touch-manipulation">
                 <span className="text-green-800 font-medium text-sm sm:text-base">Successful Uploads</span>
-                <span className="text-green-600 font-bold text-xl sm:text-2xl">{uploadedFiles.length}</span>
+                <span className="text-green-600 font-bold text-xl sm:text-2xl">{uploadStats.successful}</span>
               </div>
               <div className="flex justify-between items-center p-3 sm:p-4 bg-red-50 rounded-lg border border-red-200 touch-manipulation">
                 <span className="text-red-800 font-medium text-sm sm:text-base">Failed Uploads</span>
-                <span className="text-red-600 font-bold text-xl sm:text-2xl">{uploadErrors.length}</span>
+                <span className="text-red-600 font-bold text-xl sm:text-2xl">{uploadStats.failed}</span>
               </div>
               <div className="flex justify-between items-center p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200 touch-manipulation">
                 <span className="text-blue-800 font-medium text-sm sm:text-base">Total Attempts</span>
-                <span className="text-blue-600 font-bold text-xl sm:text-2xl">{uploadedFiles.length + uploadErrors.length}</span>
+                <span className="text-blue-600 font-bold text-xl sm:text-2xl">{uploadStats.total}</span>
               </div>
             </div>
-            {(uploadedFiles.length > 0 || uploadErrors.length > 0) && (
+            {uploadStats.total > 0 && (
               <button
                 onClick={clearHistory}
                 className="mt-4 w-full px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors touch-manipulation min-h-[48px] flex items-center justify-center"
@@ -100,40 +118,35 @@ const FileUploadPage = () => {
               Recent Activity
             </h3>
             <div className="space-y-2 sm:space-y-3 max-h-64 sm:max-h-80 overflow-y-auto">
-              {/* Recent successful uploads */}
-              {uploadedFiles.slice(-5).reverse().map((item, index) => (
-                <div key={`success-${index}`} className="flex items-center p-3 bg-green-50 rounded-lg border border-green-200 touch-manipulation">
-                  <span className="text-green-600 mr-3 text-lg">✅</span>
+              {/* Recent activity */}
+              {recentActivity.map((item, index) => (
+                <div key={`activity-${index}`} className={`flex items-center p-3 rounded-lg border touch-manipulation ${
+                  item.status === 'success' 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-red-50 border-red-200'
+                }`}>
+                  <span className={`mr-3 text-lg ${
+                    item.status === 'success' ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {item.status === 'success' ? '✅' : '❌'}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-900 truncate">
-                      {item.file.name}
+                      {item.name}
                     </div>
+                    {item.status === 'error' && item.error && (
+                      <div className="text-xs text-red-600 truncate">
+                        {item.error}
+                      </div>
+                    )}
                     <div className="text-xs text-gray-500">
-                      {item.timestamp.toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              
-              {/* Recent errors */}
-              {uploadErrors.slice(-3).reverse().map((item, index) => (
-                <div key={`error-${index}`} className="flex items-center p-3 bg-red-50 rounded-lg border border-red-200 touch-manipulation">
-                  <span className="text-red-600 mr-3 text-lg">❌</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">
-                      {item.filename}
-                    </div>
-                    <div className="text-xs text-red-600 truncate">
-                      {item.error}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {item.timestamp.toLocaleString()}
+                      {new Date(item.date).toLocaleString()}
                     </div>
                   </div>
                 </div>
               ))}
 
-              {uploadedFiles.length === 0 && uploadErrors.length === 0 && (
+              {recentActivity.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -193,10 +206,10 @@ const FileUploadPage = () => {
             </svg>
             <div>
               <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> This is a demonstration of the file upload system. 
-                In a production environment, you would need to configure a proper backend endpoint 
-                to handle file uploads. Currently, the upload endpoint is set to &lsquo;/api/upload&rsquo; 
-                which you&rsquo;ll need to implement on your server.
+                <strong>Note:</strong> This file upload system uses client-side storage (IndexedDB) 
+                to store your files locally in your browser. Files are persistent and will remain 
+                available until you clear your browser data. This solution works perfectly for 
+                static hosting platforms like GitHub Pages without requiring a backend server.
               </p>
             </div>
           </div>
