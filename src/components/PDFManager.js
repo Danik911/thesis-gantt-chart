@@ -21,6 +21,7 @@ const PDFManager = ({
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [showNotesPanel, setShowNotesPanel] = useState(false);
   const [notesCount, setNotesCount] = useState(new Map());
+  const [initError, setInitError] = useState(null);
 
   // Load PDF files from IndexedDB storage
   useEffect(() => {
@@ -29,12 +30,27 @@ const PDFManager = ({
 
   const loadStoredFiles = async () => {
     try {
+      console.log('PDFManager: Starting to load stored files...');
       setLoadingFiles(true);
-      await fileStorageService.initDB();
+      setInitError(null);
+      
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('IndexedDB initialization timeout')), 10000)
+      );
+      
+      const initPromise = fileStorageService.initDB();
+      
+      await Promise.race([initPromise, timeoutPromise]);
+      console.log('PDFManager: IndexedDB initialized successfully');
+      
       const storedFiles = await fileStorageService.listFiles();
+      console.log('PDFManager: Found stored files:', storedFiles.length);
       
       // Filter only PDF files and get full file data
       const pdfMetadata = storedFiles.filter(storedFile => storedFile.type === 'application/pdf');
+      console.log('PDFManager: PDF files found:', pdfMetadata.length);
+      
       const pdfFiles = [];
       
       for (const metadata of pdfMetadata) {
@@ -61,13 +77,19 @@ const PDFManager = ({
       }
 
       setPdfFiles(pdfFiles);
+      console.log('PDFManager: PDF files loaded successfully:', pdfFiles.length);
       
       // Load notes count for each file
       await loadNotesCount(pdfFiles);
+      console.log('PDFManager: Notes count loaded');
     } catch (error) {
-      console.error('Error loading stored files:', error);
+      console.error('PDFManager: Error loading stored files:', error);
+      setInitError(error.message);
+      // Set empty files array on error to show empty state instead of infinite loading
+      setPdfFiles([]);
     } finally {
       setLoadingFiles(false);
+      console.log('PDFManager: Finished loading stored files');
     }
   };
 
@@ -235,7 +257,24 @@ const PDFManager = ({
   if (loadingFiles) {
     return (
       <div className={`pdf-manager flex items-center justify-center min-h-64 ${className}`}>
-        <LoadingSpinner message="Loading PDF library..." />
+        <div className="text-center">
+          <LoadingSpinner message="Loading PDF library..." />
+          {initError && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm font-medium">Initialization Error:</p>
+              <p className="text-red-500 text-sm">{initError}</p>
+              <button
+                onClick={() => {
+                  setInitError(null);
+                  loadStoredFiles();
+                }}
+                className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -336,6 +375,11 @@ const PDFManager = ({
           <p className="text-gray-600 mt-1">
             {pdfFiles.length} {pdfFiles.length === 1 ? 'file' : 'files'} in your library
           </p>
+          {initError && (
+            <p className="text-red-500 text-sm mt-1">
+              ⚠️ There was an issue loading the library. Some features may not work correctly.
+            </p>
+          )}
         </div>
       </div>
 
