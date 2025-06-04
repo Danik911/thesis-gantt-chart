@@ -193,14 +193,15 @@ class AudioProcessingService {
 
   // Convert M4A to MP3 using Transloadit
   async convertM4AToMP3(file, progressCallback = null) {
+    const fileId = `${file.name}_${Date.now()}`;
     try {
-      const fileId = `${file.name}_${Date.now()}`;
       if (progressCallback) {
         this.registerProgressCallback(fileId, progressCallback);
       }
 
       this.updateProgress(fileId, { status: 'starting', progress: 0 });
 
+      /* Disabled for deployment
       const assembly = await this.transloaditClient.createAssembly({
         params: this.conversionTemplates.m4aToMp3,
         files: { input: file },
@@ -238,6 +239,10 @@ class AudioProcessingService {
       } else {
         throw new Error('Conversion failed');
       }
+      */
+      
+      // Fallback implementation for deployment
+      throw new Error('Conversion service disabled for deployment');
     } catch (error) {
       console.error('M4A to MP3 conversion failed:', error);
       this.updateProgress(fileId, { 
@@ -253,14 +258,15 @@ class AudioProcessingService {
 
   // Convert WAV to MP3 using Transloadit
   async convertWAVToMP3(file, progressCallback = null) {
+    const fileId = `${file.name}_${Date.now()}`;
     try {
-      const fileId = `${file.name}_${Date.now()}`;
       if (progressCallback) {
         this.registerProgressCallback(fileId, progressCallback);
       }
 
       this.updateProgress(fileId, { status: 'starting', progress: 0 });
 
+      /* Disabled for deployment
       const assembly = await this.transloaditClient.createAssembly({
         params: this.conversionTemplates.wavToMp3,
         files: { input: file },
@@ -298,6 +304,10 @@ class AudioProcessingService {
       } else {
         throw new Error('Conversion failed');
       }
+      */
+      
+      // Fallback implementation for deployment
+      throw new Error('Conversion service disabled for deployment');
     } catch (error) {
       console.error('WAV to MP3 conversion failed:', error);
       this.updateProgress(fileId, { 
@@ -313,6 +323,7 @@ class AudioProcessingService {
 
   // Generate waveform using Transloadit
   async generateWaveform(file, progressCallback = null) {
+    const fileId = `waveform_${file.name}_${Date.now()}`;
     try {
       const cacheKey = `waveform_${file.name}_${file.size}`;
       const cached = this.getCachedData(cacheKey);
@@ -320,13 +331,13 @@ class AudioProcessingService {
         return cached;
       }
 
-      const fileId = `waveform_${file.name}_${Date.now()}`;
       if (progressCallback) {
         this.registerProgressCallback(fileId, progressCallback);
       }
 
       this.updateProgress(fileId, { status: 'starting', progress: 0 });
 
+      /* Disabled for deployment
       const assembly = await this.transloaditClient.createAssembly({
         params: this.conversionTemplates.waveformGeneration,
         files: { input: file },
@@ -365,6 +376,10 @@ class AudioProcessingService {
       } else {
         throw new Error('Waveform generation failed');
       }
+      */
+      
+      // Fallback implementation for deployment
+      throw new Error('Waveform generation service disabled for deployment');
     } catch (error) {
       console.error('Waveform generation failed:', error);
       this.updateProgress(fileId, { 
@@ -383,6 +398,7 @@ class AudioProcessingService {
 
   // Generate audio thumbnail
   async generateThumbnail(file, progressCallback = null) {
+    const fileId = `thumbnail_${file.name}_${Date.now()}`;
     try {
       const cacheKey = `thumbnail_${file.name}_${file.size}`;
       const cached = this.getCachedData(cacheKey);
@@ -396,11 +412,11 @@ class AudioProcessingService {
         throw new Error('Failed to generate waveform for thumbnail');
       }
 
-      const fileId = `thumbnail_${file.name}_${Date.now()}`;
       if (progressCallback) {
         this.registerProgressCallback(fileId, progressCallback);
       }
 
+      /* Disabled for deployment
       // Create a template that uses the waveform to generate thumbnail
       const thumbnailTemplate = {
         steps: {
@@ -443,6 +459,10 @@ class AudioProcessingService {
       } else {
         throw new Error('Thumbnail generation failed');
       }
+      */
+      
+      // Fallback implementation for deployment
+      throw new Error('Thumbnail generation service disabled for deployment');
     } catch (error) {
       console.error('Thumbnail generation failed:', error);
       return {
@@ -455,8 +475,8 @@ class AudioProcessingService {
 
   // Process audio file comprehensively
   async processAudioFile(file, options = {}) {
+    const fileId = `process_${file.name}_${Date.now()}`;
     try {
-      const fileId = `process_${file.name}_${Date.now()}`;
       const progressCallback = options.progressCallback;
       
       if (progressCallback) {
@@ -603,4 +623,4 @@ class AudioProcessingService {
 // Create singleton instance
 const audioProcessingService = new AudioProcessingService();
 
-export default audioProcessingService; 
+export default audioProcessingService;
