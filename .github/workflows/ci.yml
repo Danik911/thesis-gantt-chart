@@ -38,7 +38,7 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: npm install
     
     - name: Run linter (continue on error)
       run: npm run lint || echo "Linting completed with warnings"
@@ -87,8 +87,8 @@ jobs:
         node-version: '20'
         cache: 'npm'
     
-    - name: Install dependencies
-      run: npm ci
+    - name: Install dependencies for testing
+      run: npm install
     
     - name: Run linter
       run: npm run lint
