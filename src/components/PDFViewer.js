@@ -1,8 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure PDF.js worker with explicit HTTPS protocol
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.7.107/pdf.worker.min.js`;
+import pdfjsLib from '../utils/pdfConfig';
 
 const PDFViewer = ({ 
   file, 
