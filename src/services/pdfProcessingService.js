@@ -12,8 +12,8 @@ class PDFProcessingService {
     this.maxCacheSize = 50;
     this.cacheExpiryTime = 30 * 60 * 1000; // 30 minutes
     
-    // Configure PDF.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.7.107/pdf.worker.min.js`;
+    // Configure PDF.js worker with explicit HTTPS protocol
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.7.107/pdf.worker.min.js`;
     
     this.defaultOptions = {
       thumbnailWidth: 200,
