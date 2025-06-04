@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/thesis-gantt-chart/static/css/main.ce4e3436.css",
-    "main.js": "/thesis-gantt-chart/static/js/main.8c2693e7.js",
+    "main.js": "/thesis-gantt-chart/static/js/main.d6c62e7f.js",
     "static/js/940.3bc2c4d0.chunk.js": "/thesis-gantt-chart/static/js/940.3bc2c4d0.chunk.js",
     "static/css/35.bfd04fcd.chunk.css": "/thesis-gantt-chart/static/css/35.bfd04fcd.chunk.css",
     "static/js/35.f1e0cbe3.chunk.js": "/thesis-gantt-chart/static/js/35.f1e0cbe3.chunk.js",
@@ -18,7 +18,7 @@
     "static/js/614.18863eb4.chunk.js": "/thesis-gantt-chart/static/js/614.18863eb4.chunk.js",
     "index.html": "/thesis-gantt-chart/index.html",
     "main.ce4e3436.css.map": "/thesis-gantt-chart/static/css/main.ce4e3436.css.map",
-    "main.8c2693e7.js.map": "/thesis-gantt-chart/static/js/main.8c2693e7.js.map",
+    "main.d6c62e7f.js.map": "/thesis-gantt-chart/static/js/main.d6c62e7f.js.map",
     "940.3bc2c4d0.chunk.js.map": "/thesis-gantt-chart/static/js/940.3bc2c4d0.chunk.js.map",
     "35.bfd04fcd.chunk.css.map": "/thesis-gantt-chart/static/css/35.bfd04fcd.chunk.css.map",
     "35.f1e0cbe3.chunk.js.map": "/thesis-gantt-chart/static/js/35.f1e0cbe3.chunk.js.map",
@@ -36,6 +36,6 @@
   },
   "entrypoints": [
     "static/css/main.ce4e3436.css",
-    "static/js/main.8c2693e7.js"
+    "static/js/main.d6c62e7f.js"
   ]
 }
