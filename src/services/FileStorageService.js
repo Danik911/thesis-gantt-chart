@@ -199,6 +199,56 @@ class FileStorageService {
   }
 
   /**
+   * Download a file from storage by triggering browser download
+   * @param {string} fileId - The file ID to download
+   * @returns {Promise<void>} - Download promise
+   */
+  async downloadFile(fileId) {
+    try {
+      const fileData = await this.getFile(fileId);
+      
+      // Create a Blob from the stored ArrayBuffer
+      const blob = new Blob([fileData.data], { type: fileData.type });
+      
+      // Create a temporary URL for the blob
+      const url = URL.createObjectURL(blob);
+      
+      // Create a temporary download link and trigger the download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileData.name;
+      link.style.display = 'none';
+      
+      // Add to DOM, click, then remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the temporary URL
+      URL.revokeObjectURL(url);
+      
+      return Promise.resolve();
+    } catch (error) {
+      throw new Error(`Download failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get file URL for preview purposes
+   * @param {string} fileId - The file ID
+   * @returns {Promise<string>} - Blob URL for the file
+   */
+  async getFileUrl(fileId) {
+    try {
+      const fileData = await this.getFile(fileId);
+      const blob = new Blob([fileData.data], { type: fileData.type });
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      throw new Error(`Failed to create file URL: ${error.message}`);
+    }
+  }
+
+  /**
    * Update upload statistics in localStorage
    * @param {string} type - 'success' or 'error'
    */
