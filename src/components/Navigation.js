@@ -1,97 +1,59 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useRole } from '../contexts/RoleContext';
-import { useUserManagementPermissions, useAdminPermissions } from '../hooks/usePermissions';
-import LoginButton from './LoginButton';
 import UserProfile from './UserProfile';
 
 const Navigation = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-  const { canViewUsers } = useUserManagementPermissions();
-  const { canViewAuditLog } = useAdminPermissions();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
-  const userMenuRef = useRef(null);
 
-  // Base navigation items available to all authenticated users
+  // Base navigation items available to all users (removed requiresAuth)
   const baseNavItems = [
     {
       path: '/',
       label: 'Gantt Chart',
       icon: '📊',
-      description: 'View and manage your project timeline',
-      requiresAuth: true
+      description: 'View and manage your project timeline'
     },
     {
       path: '/daily-progress',
       label: 'Daily Progress',
       icon: '✅',
-      description: 'Track your daily accomplishments',
-      requiresAuth: true
+      description: 'Track your daily accomplishments'
     },
     {
       path: '/text-notes',
       label: 'Text Notes',
       icon: '📝',
-      description: 'Create and manage text notes with rich editing',
-      requiresAuth: true
+      description: 'Create and manage text notes with rich editing'
     },
     {
       path: '/file-upload',
       label: 'File Upload',
       icon: '📁',
-      description: 'Upload PDF, M4A, and WAV files',
-      requiresAuth: true
+      description: 'Upload PDF, M4A, and WAV files'
     },
     {
       path: '/pdf-manager',
       label: 'PDF Library',
       icon: '📄',
-      description: 'View and manage PDF documents with annotations',
-      requiresAuth: true
+      description: 'View and manage PDF documents with annotations'
     },
     {
       path: '/github-files',
       label: 'GitHub Files',
       icon: '🔗',
-      description: 'Manage files in GitHub repositories',
-      requiresAuth: true
+      description: 'Manage files in GitHub repositories'
     }
   ];
 
-  // Role-based navigation items
-  const roleBasedNavItems = [
-    ...(canViewUsers ? [{
-      path: '/user-management',
-      label: 'User Management',
-      icon: '👥',
-      description: 'Manage user roles and permissions',
-      requiresAuth: true
-    }] : []),
-    ...(canViewAuditLog ? [{
-      path: '/audit-log',
-      label: 'Audit Log',
-      icon: '📋',
-      description: 'View system activities and user actions',
-      requiresAuth: true
-    }] : [])
-  ];
-
-  // Combine all navigation items
-  const navItems = [...baseNavItems, ...roleBasedNavItems].filter(item => 
-    !item.requiresAuth || isAuthenticated
-  );
+  // All navigation items are now available (removed role-based filtering and auth requirements)
+  const navItems = baseNavItems;
 
   // Close mobile menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
         setIsMobileMenuOpen(false);
-      }
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setIsUserMenuOpen(false);
       }
     };
 
@@ -150,35 +112,8 @@ const Navigation = () => {
             ))}
           </div>
 
-          {/* Right side - Authentication and Mobile Menu Button */}
+          {/* Right side - Mobile Menu Button only */}
           <div className="flex items-center space-x-2">
-            {/* Desktop Authentication */}
-            <div className="hidden sm:block">
-              {isLoading ? (
-                <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
-              ) : isAuthenticated ? (
-                <div ref={userMenuRef} className="relative">
-                  <button
-                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors touch-manipulation"
-                    aria-expanded={isUserMenuOpen}
-                    aria-haspopup="true"
-                  >
-                    <UserProfile compact />
-                  </button>
-                  
-                  {/* User dropdown menu */}
-                  {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
-                      <UserProfile expanded onClose={() => setIsUserMenuOpen(false)} />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <LoginButton size="small" variant="outline" />
-              )}
-            </div>
-
             {/* Mobile menu button */}
             <button
               onClick={toggleMobileMenu}
@@ -248,23 +183,6 @@ const Navigation = () => {
                 </div>
               </NavLink>
             ))}
-            
-            {/* Mobile Authentication */}
-            <div className="border-t border-gray-200 pt-3 mt-3">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
-                </div>
-              ) : isAuthenticated ? (
-                <div className="px-4 py-2">
-                  <UserProfile mobile onClose={handleNavClick} />
-                </div>
-              ) : (
-                <div className="px-4 py-2">
-                  <LoginButton size="large" variant="primary" fullWidth />
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
