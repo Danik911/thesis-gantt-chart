@@ -15,13 +15,35 @@ const OAuthCallback = () => {
         setIsProcessing(true);
         setError(null);
 
-        // Parse URL parameters
-        const urlParams = new URLSearchParams(location.search);
-        const code = urlParams.get('code');
-        const state = urlParams.get('state');
-        const errorParam = urlParams.get('error');
-        const errorDescription = urlParams.get('error_description');
+        // Get the full URL
+        const fullUrl = window.location.href;
+        let code, state, errorParam, errorDescription;
 
+        // Check if query parameters are before the hash
+        const hashIndex = fullUrl.indexOf('#');
+        // Use the part before '#' if '#' exists, otherwise the full URL might be the search part
+        const preHashPart = hashIndex > -1 ? fullUrl.substring(0, hashIndex) : fullUrl;
+        
+        const questionMarkIndex = preHashPart.indexOf('?');
+        if (questionMarkIndex > -1) {
+            const queryParamsString = preHashPart.substring(questionMarkIndex + 1);
+            const urlParams = new URLSearchParams(queryParamsString);
+            code = urlParams.get('code');
+            state = urlParams.get('state');
+            errorParam = urlParams.get('error');
+            errorDescription = urlParams.get('error_description');
+        }
+
+        // Fallback to check location.search from router if primary parsing failed
+        // This is mostly for safety, primary logic relies on parsing fullUrl
+        if (!code && location.search) {
+            const routerUrlParams = new URLSearchParams(location.search);
+            if (routerUrlParams.has('code')) code = routerUrlParams.get('code');
+            if (routerUrlParams.has('state')) state = routerUrlParams.get('state');
+            if (routerUrlParams.has('error')) errorParam = routerUrlParams.get('error');
+            if (routerUrlParams.has('error_description')) errorDescription = routerUrlParams.get('error_description');
+        }
+        
         // Check for OAuth errors
         if (errorParam) {
           throw new Error(errorDescription || `OAuth Error: ${errorParam}`);
@@ -56,7 +78,7 @@ const OAuthCallback = () => {
     };
 
     processCallback();
-  }, [location.search, handleOAuthCallback, navigate]);
+  }, [handleOAuthCallback, navigate]);
 
   const handleRetry = () => {
     setError(null);
