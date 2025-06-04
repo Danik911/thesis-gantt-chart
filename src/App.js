@@ -15,7 +15,7 @@ const DailyProgress = lazy(() => import('./components/DailyProgress'));
 const TextNotes = lazy(() => import('./components/TextNotes'));
 const FileUploadPage = lazy(() => import('./components/FileUploadPage'));
 const GitHubFileManager = lazy(() => import('./components/GitHubFileManager'));
-const OAuthCallback = lazy(() => import('./components/OAuthCallback'));
+// const OAuthCallback = lazy(() => import('./components/OAuthCallback')); // Removed OAuthCallback
 const PDFManager = lazy(() => import('./components/PDFManager'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
 const AuditLog = lazy(() => import('./components/AuditLog'));
@@ -111,7 +111,8 @@ function App() {
                       </ErrorBoundary>
                     } 
                   />
-                  {/* OAuth callback route */}
+                  {/* OAuth callback route has been removed */}
+                  {/* 
                   <Route 
                     path="/auth/callback" 
                     element={
@@ -122,6 +123,7 @@ function App() {
                       </ErrorBoundary>
                     } 
                   />
+                  */}
                   <Route 
                     path="/user-management" 
                     element={
