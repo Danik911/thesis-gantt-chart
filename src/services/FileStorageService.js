@@ -71,6 +71,7 @@ class FileStorageService {
         size: file.size,
         data: arrayBuffer,
         uploadDate: uploadDate,
+        uploadedAt: uploadDate, // Add this for compatibility with PDFManager
         metadata: metadata
       };
 
@@ -172,6 +173,39 @@ class FileStorageService {
           type: file.type,
           size: file.size,
           uploadDate: file.uploadDate,
+          uploadedAt: file.uploadedAt, // Add this for compatibility
+          metadata: file.metadata
+        }));
+        resolve(files);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  /**
+   * Get all stored files including their binary data
+   * This method is needed for download functionality
+   * @returns {Promise<Array>} - Array of complete file data
+   */
+  async getAllFiles() {
+    await this.initDB();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.storeName], 'readonly');
+      const store = transaction.objectStore(this.storeName);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        // Return complete file data including binary content
+        const files = request.result.map(file => ({
+          id: file.id,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          data: file.data, // Include the binary data
+          uploadDate: file.uploadDate,
+          uploadedAt: file.uploadedAt || file.uploadDate, // Add this for compatibility
           metadata: file.metadata
         }));
         resolve(files);
@@ -304,4 +338,4 @@ class FileStorageService {
 
 // Export a singleton instance
 const fileStorageService = new FileStorageService();
-export default fileStorageService; 
+export default fileStorageService;
