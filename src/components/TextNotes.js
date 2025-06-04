@@ -23,6 +23,47 @@ const TextNotes = () => {
   const [newFolder, setNewFolder] = useState('');
   const [showNotesList, setShowNotesList] = useState(true);
 
+  // Character and word count
+  const { characterCount, wordCount } = useMemo(() => {
+    const contentState = editorState.getCurrentContent();
+    const text = contentState.getPlainText('');
+    return {
+      characterCount: text.length,
+      wordCount: text.trim() ? text.trim().split(/\s+/).length : 0
+    };
+  }, [editorState]);
+
+  // Move saveCurrentNote function declaration before useEffect that uses it
+  const saveCurrentNote = useCallback(() => {
+    if (!noteTitle.trim()) return;
+
+    const contentState = editorState.getCurrentContent();
+    const rawContent = convertToRaw(contentState);
+    const htmlContent = stateToHTML(contentState);
+    
+    const noteData = {
+      id: currentNote?.id || Date.now(),
+      title: noteTitle,
+      content: rawContent,
+      htmlContent,
+      markdownContent: isMarkdownMode ? markdownContent : '',
+      tags: selectedTags,
+      folder: selectedFolder,
+      createdAt: currentNote?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      characterCount,
+      wordCount
+    };
+
+    const updatedNotes = currentNote 
+      ? notes.map(note => note.id === currentNote.id ? noteData : note)
+      : [...notes, noteData];
+
+    setNotes(updatedNotes);
+    setCurrentNote(noteData);
+    localStorage.setItem('textNotes', JSON.stringify(updatedNotes));
+  }, [editorState, noteTitle, selectedTags, selectedFolder, markdownContent, isMarkdownMode, characterCount, wordCount, currentNote, notes]);
+
   // Load notes from localStorage on component mount
   useEffect(() => {
     const savedNotes = localStorage.getItem('textNotes');
@@ -63,7 +104,7 @@ const TextNotes = () => {
     }
   }, []);
 
-  // Auto-save functionality
+  // Auto-save functionality - now saveCurrentNote is defined before this useEffect
   useEffect(() => {
     if (currentNote && noteTitle.trim()) {
       setAutoSaveStatus('saving');
@@ -75,46 +116,6 @@ const TextNotes = () => {
       return () => clearTimeout(timer);
     }
   }, [editorState, noteTitle, selectedTags, selectedFolder, markdownContent, currentNote, saveCurrentNote]);
-
-  // Character and word count
-  const { characterCount, wordCount } = useMemo(() => {
-    const contentState = editorState.getCurrentContent();
-    const text = contentState.getPlainText('');
-    return {
-      characterCount: text.length,
-      wordCount: text.trim() ? text.trim().split(/\s+/).length : 0
-    };
-  }, [editorState]);
-
-  const saveCurrentNote = useCallback(() => {
-    if (!noteTitle.trim()) return;
-
-    const contentState = editorState.getCurrentContent();
-    const rawContent = convertToRaw(contentState);
-    const htmlContent = stateToHTML(contentState);
-    
-    const noteData = {
-      id: currentNote?.id || Date.now(),
-      title: noteTitle,
-      content: rawContent,
-      htmlContent,
-      markdownContent: isMarkdownMode ? markdownContent : '',
-      tags: selectedTags,
-      folder: selectedFolder,
-      createdAt: currentNote?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      characterCount,
-      wordCount
-    };
-
-    const updatedNotes = currentNote 
-      ? notes.map(note => note.id === currentNote.id ? noteData : note)
-      : [...notes, noteData];
-
-    setNotes(updatedNotes);
-    setCurrentNote(noteData);
-    localStorage.setItem('textNotes', JSON.stringify(updatedNotes));
-  }, [editorState, noteTitle, selectedTags, selectedFolder, markdownContent, isMarkdownMode, characterCount, wordCount, currentNote, notes]);
 
   const createNewNote = () => {
     if (currentNote && noteTitle.trim()) {
