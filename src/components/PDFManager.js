@@ -37,13 +37,14 @@ const PDFManager = ({
           const blob = new Blob([storedFile.data], { type: storedFile.type });
           const file = new File([blob], storedFile.name, {
             type: storedFile.type,
-            lastModified: new Date(storedFile.uploadedAt).getTime()
+            lastModified: new Date(storedFile.uploadedAt || storedFile.uploadDate).getTime()
           });
           
           // Add metadata from storage
           file.storedId = storedFile.id;
-          file.uploadedAt = storedFile.uploadedAt;
+          file.uploadedAt = storedFile.uploadedAt || storedFile.uploadDate;
           file.metadata = storedFile.metadata;
+          file.originalData = storedFile.data; // Keep reference to original binary data
           
           return file;
         });
@@ -149,17 +150,36 @@ const PDFManager = ({
 
   const downloadFile = (file) => {
     try {
-      const blob = new Blob([file], { type: file.type });
+      // Create blob from the file data
+      let blob;
+      
+      if (file.originalData) {
+        // If we have the original binary data, use it directly
+        blob = new Blob([file.originalData], { type: file.type });
+      } else {
+        // Fallback: try to read the file as is
+        blob = new Blob([file], { type: file.type });
+      }
+      
+      // Create download link
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = file.name;
+      link.style.display = 'none';
+      
+      // Trigger download
       document.body.appendChild(link);
       link.click();
+      
+      // Cleanup
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      
+      console.log(`Successfully downloaded: ${file.name}`);
     } catch (error) {
       console.error('Error downloading file:', error);
+      alert(`Failed to download ${file.name}. Please try again.`);
     }
   };
 
@@ -172,6 +192,16 @@ const PDFManager = ({
       if (file.storedId) {
         await fileStorageService.deleteFile(file.storedId);
         await loadStoredFiles(); // Refresh the list
+        
+        // Remove from processed PDFs cache
+        const fileKey = `${file.name}_${file.size}`;
+        setProcessedPdfs(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(fileKey);
+          return newMap;
+        });
+        
+        console.log(`Successfully deleted: ${file.name}`);
       }
     } catch (error) {
       console.error('Error deleting file:', error);
@@ -194,6 +224,14 @@ const PDFManager = ({
           </div>
           
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => downloadFile(selectedPdfFile)}
+              className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 flex items-center gap-1"
+              title="Download PDF"
+            >
+              <span>📥</span>
+              <span className="hidden sm:inline">Download</span>
+            </button>
             <span className="text-sm text-gray-600">
               {formatFileSize(selectedPdfFile.size)}
             </span>
