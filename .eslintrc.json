@@ -2,12 +2,14 @@
   "env": {
     "browser": true,
     "es2021": true,
-    "node": true
+    "node": true,
+    "jest": true
   },
   "extends": [
     "eslint:recommended",
     "plugin:react/recommended",
     "plugin:react-hooks/recommended",
+    "plugin:jest/recommended",
     "prettier"
   ],
   "parserOptions": {
@@ -19,7 +21,8 @@
   },
   "plugins": [
     "react",
-    "react-hooks"
+    "react-hooks",
+    "jest"
   ],
   "rules": {
     "react/react-in-jsx-scope": "off",
@@ -32,5 +35,13 @@
     "react": {
       "version": "detect"
     }
-  }
-} 
+  },
+  "overrides": [
+    {
+      "files": ["**/__tests__/**/*", "**/*.{test,spec}.*"],
+      "env": {
+        "jest": true
+      }
+    }
+  ]
+}
