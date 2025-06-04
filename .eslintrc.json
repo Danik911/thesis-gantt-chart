@@ -9,7 +9,6 @@
     "eslint:recommended",
     "plugin:react/recommended",
     "plugin:react-hooks/recommended",
-    "plugin:jest/recommended",
     "prettier"
   ],
   "parserOptions": {
@@ -21,8 +20,7 @@
   },
   "plugins": [
     "react",
-    "react-hooks",
-    "jest"
+    "react-hooks"
   ],
   "rules": {
     "react/react-in-jsx-scope": "off",
@@ -41,6 +39,17 @@
       "files": ["**/__tests__/**/*", "**/*.{test,spec}.*"],
       "env": {
         "jest": true
+      },
+      "globals": {
+        "describe": "readonly",
+        "it": "readonly",
+        "test": "readonly",
+        "expect": "readonly",
+        "beforeEach": "readonly",
+        "afterEach": "readonly",
+        "beforeAll": "readonly",
+        "afterAll": "readonly",
+        "jest": "readonly"
       }
     }
   ]
