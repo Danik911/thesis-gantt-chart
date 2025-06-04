@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import PDFViewer from './PDFViewer';
+import PDFNotesPanel from './PDFNotesPanel';
 import pdfProcessingService from '../services/pdfProcessingService';
 import fileStorageService from '../services/FileStorageService';
+import notesService from '../services/NotesService';
 import LoadingSpinner from './LoadingSpinner';
 
 const PDFManager = ({ 
@@ -17,6 +19,8 @@ const PDFManager = ({
   const [searchResults, setSearchResults] = useState([]);
   const [showViewer, setShowViewer] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(true);
+  const [showNotesPanel, setShowNotesPanel] = useState(false);
+  const [notesCount, setNotesCount] = useState(new Map());
 
   // Load PDF files from IndexedDB storage
   useEffect(() => {
@@ -27,28 +31,49 @@ const PDFManager = ({
     try {
       setLoadingFiles(true);
       await fileStorageService.initDB();
-      const storedFiles = await fileStorageService.getAllFiles();
+      const storedFiles = await fileStorageService.listFiles();
       
-      // Filter only PDF files and convert to File objects
-      const pdfFiles = storedFiles
-        .filter(storedFile => storedFile.type === 'application/pdf')
-        .map(storedFile => {
+      // Filter only PDF files and get full file data
+      const pdfMetadata = storedFiles.filter(storedFile => storedFile.type === 'application/pdf');
+      const pdfFiles = [];
+      
+      for (const metadata of pdfMetadata) {
+        try {
+          // Get full file data including content
+          const fullFileData = await fileStorageService.getFile(metadata.id);
+          
           // Create File object from stored data
-          const blob = new Blob([storedFile.data], { type: storedFile.type });
-          const file = new File([blob], storedFile.name, {
-            type: storedFile.type,
-            lastModified: new Date(storedFile.uploadedAt).getTime()
+          const blob = new Blob([fullFileData.data], { type: fullFileData.type });
+          const file = new File([blob], fullFileData.name, {
+            type: fullFileData.type,
+            lastModified: new Date(fullFileData.uploadDate).getTime()
           });
           
           // Add metadata from storage
-          file.storedId = storedFile.id;
-          file.uploadedAt = storedFile.uploadedAt;
-          file.metadata = storedFile.metadata;
+          file.storedId = fullFileData.id;
+          file.uploadedAt = fullFileData.uploadDate;
+          file.metadata = fullFileData.metadata;
           
-          return file;
-        });
+          pdfFiles.push(file);
+        } catch (error) {
+          console.error('Error loading file:', metadata.name, error);
+        }
+      }
 
       setPdfFiles(pdfFiles);
+      
+      // Load notes count for each file
+      const counts = new Map();
+      for (const file of pdfFiles) {
+        try {
+          const notes = await notesService.getNotesForFile(file.storedId || file.name);
+          counts.set(file.storedId || file.name, notes.length);
+        } catch (error) {
+          console.error('Error loading notes for file:', file.name, error);
+          counts.set(file.storedId || file.name, 0);
+        }
+      }
+      setNotesCount(counts);
     } catch (error) {
       console.error('Error loading stored files:', error);
     } finally {
@@ -194,26 +219,62 @@ const PDFManager = ({
           </div>
           
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowNotesPanel(!showNotesPanel)}
+              className={`px-3 py-1 text-sm rounded transition-colors flex items-center gap-2 ${
+                showNotesPanel 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Notes {notesCount.get(selectedPdfFile.storedId || selectedPdfFile.name) > 0 && 
+                `(${notesCount.get(selectedPdfFile.storedId || selectedPdfFile.name)})`
+              }
+            </button>
+            
             <span className="text-sm text-gray-600">
               {formatFileSize(selectedPdfFile.size)}
             </span>
           </div>
         </div>
         
-        <div className="viewer-content flex-1">
-          <PDFViewer
-            file={selectedPdfFile}
-            onMetadataExtracted={(metadata) => {
-              console.log('Extracted metadata:', metadata);
-            }}
-            onTextExtracted={(textContent) => {
-              console.log('Extracted text content:', textContent);
-            }}
-            onError={(error) => {
-              console.error('PDF viewer error:', error);
-            }}
-            className="h-full"
-          />
+        <div className="viewer-content flex-1 flex">
+          <div className={`pdf-viewer-container ${showNotesPanel ? 'flex-1' : 'w-full'}`}>
+            <PDFViewer
+              file={selectedPdfFile}
+              onMetadataExtracted={(metadata) => {
+                console.log('Extracted metadata:', metadata);
+              }}
+              onTextExtracted={(textContent) => {
+                console.log('Extracted text content:', textContent);
+              }}
+              onError={(error) => {
+                console.error('PDF viewer error:', error);
+              }}
+              className="h-full"
+            />
+          </div>
+          
+          {showNotesPanel && (
+            <PDFNotesPanel
+              fileId={selectedPdfFile.storedId || selectedPdfFile.name}
+              fileName={selectedPdfFile.name}
+              onClose={() => setShowNotesPanel(false)}
+              onNotesChanged={async () => {
+                // Refresh notes count for this file
+                try {
+                  const notes = await notesService.getNotesForFile(selectedPdfFile.storedId || selectedPdfFile.name);
+                  setNotesCount(prev => new Map(prev).set(selectedPdfFile.storedId || selectedPdfFile.name, notes.length));
+                } catch (error) {
+                  console.error('Error updating notes count:', error);
+                }
+              }}
+              className="w-80 h-full flex flex-col"
+            />
+          )}
         </div>
       </div>
     );
@@ -381,6 +442,23 @@ const PDFManager = ({
                         className="flex-1 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
                       >
                         Open
+                      </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFileSelect(file);
+                          setShowNotesPanel(true);
+                        }}
+                        className="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 flex items-center gap-1"
+                        title="View/Add Notes"
+                      >
+                        📝
+                        {notesCount.get(file.storedId || file.name) > 0 && (
+                          <span className="bg-purple-700 text-xs px-1 rounded-full">
+                            {notesCount.get(file.storedId || file.name)}
+                          </span>
+                        )}
                       </button>
                       
                       <button

@@ -7,7 +7,7 @@
 class FileStorageService {
   constructor() {
     this.dbName = 'thesis-file-storage';
-    this.dbVersion = 1;
+    this.dbVersion = 2; // Updated to match NotesService version
     this.storeName = 'files';
     this.db = null;
   }
@@ -36,6 +36,15 @@ class FileStorageService {
           store.createIndex('name', 'name', { unique: false });
           store.createIndex('type', 'type', { unique: false });
           store.createIndex('uploadDate', 'uploadDate', { unique: false });
+        }
+
+        // Create notes store for compatibility with NotesService
+        if (!db.objectStoreNames.contains('notes')) {
+          const notesStore = db.createObjectStore('notes', { keyPath: 'id' });
+          notesStore.createIndex('fileId', 'fileId', { unique: false });
+          notesStore.createIndex('type', 'type', { unique: false });
+          notesStore.createIndex('createdAt', 'createdAt', { unique: false });
+          notesStore.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
       };
     });
