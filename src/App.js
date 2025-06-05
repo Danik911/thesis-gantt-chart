@@ -11,7 +11,7 @@ import './utils/indexedDBReset';
 // Lazy loaded components for better performance
 const WeeklyGanttChart = lazy(() => import('./components/WeeklyGanttChart'));
 const DailyProgress = lazy(() => import('./components/DailyProgress'));
-const TextNotes = lazy(() => import('./components/TextNotes'));
+const TextNotesWithLocalStorage = lazy(() => import('./components/TextNotesWithLocalStorage'));
 const FileUploadPage = lazy(() => import('./components/FileUploadPage'));
 const GitHubFileManager = lazy(() => import('./components/GitHubFileManager'));
 const PDFManager = lazy(() => import('./components/PDFManager'));
@@ -72,7 +72,7 @@ function App() {
                 element={
                   <ErrorBoundary>
                     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-                      <TextNotes />
+                      <TextNotesWithLocalStorage />
                     </div>
                   </ErrorBoundary>
                 } 
