@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
+import { AuthProvider } from './contexts/AuthContext';
 import './App.css';
 
 // Import IndexedDB reset utility for debugging
@@ -36,11 +37,12 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <Router>
-        <div className="App min-h-screen bg-gray-50 flex flex-col safe-area-top safe-area-bottom">
-          <Navigation />
-        
-        <main className="flex-1 transition-all duration-300 safe-area-left safe-area-right">
+      <AuthProvider>
+        <Router>
+          <div className="App min-h-screen bg-gray-50 flex flex-col safe-area-top safe-area-bottom">
+            <Navigation />
+          
+          <main className="flex-1 transition-all duration-300 safe-area-left safe-area-right">
           <Suspense fallback={
             <div className="flex items-center justify-center min-h-[60vh] px-4">
               <LoadingSpinner message="Loading page..." size="large" />
@@ -164,9 +166,10 @@ function App() {
               />
             </Routes>
           </Suspense>
-        </main>
-      </div>
-    </Router>
+          </main>
+        </div>
+      </Router>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

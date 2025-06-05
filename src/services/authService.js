@@ -1,5 +1,16 @@
 import securityService from './securityService';
 import encryptionService from './encryptionService';
+import { 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  sendPasswordResetEmail
+} from 'firebase/auth';
+import { auth } from '../firebase';
 
 class AuthService {
   constructor() {
@@ -104,6 +115,80 @@ class AuthService {
   //   // Implementation for general rate limiting
   // }
 }
+
+// Initialize Google Auth Provider
+const googleProvider = new GoogleAuthProvider();
+
+// Authentication service object
+export const authService = {
+  // Sign in with email and password
+  signIn: async (email, password) => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      return { user: userCredential.user, error: null };
+    } catch (error) {
+      return { user: null, error: error.message };
+    }
+  },
+
+  // Sign up with email and password
+  signUp: async (email, password, displayName = '') => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Update user profile with display name if provided
+      if (displayName) {
+        await updateProfile(userCredential.user, {
+          displayName: displayName
+        });
+      }
+      
+      return { user: userCredential.user, error: null };
+    } catch (error) {
+      return { user: null, error: error.message };
+    }
+  },
+
+  // Sign in with Google
+  signInWithGoogle: async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      return { user: result.user, error: null };
+    } catch (error) {
+      return { user: null, error: error.message };
+    }
+  },
+
+  // Sign out
+  signOut: async () => {
+    try {
+      await signOut(auth);
+      return { error: null };
+    } catch (error) {
+      return { error: error.message };
+    }
+  },
+
+  // Send password reset email
+  resetPassword: async (email) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { error: null };
+    } catch (error) {
+      return { error: error.message };
+    }
+  },
+
+  // Get current user
+  getCurrentUser: () => {
+    return auth.currentUser;
+  },
+
+  // Listen to auth state changes
+  onAuthStateChanged: (callback) => {
+    return onAuthStateChanged(auth, callback);
+  }
+};
 
 const authServiceInstance = new AuthService();
 export default authServiceInstance; 

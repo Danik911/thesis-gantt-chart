@@ -27,6 +27,7 @@
     "draft-js-import-html": "^1.4.1",
     "express-rate-limit": "^7.5.0",
     "file-saver": "^2.0.5",
+    "firebase": "^11.8.1",
     "helmet": "^8.1.0",
     "lodash": "^4.17.21",
     "pdfjs-dist": "3.11.174",
