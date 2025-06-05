@@ -393,7 +393,7 @@ const TextNotes = () => {
               {searchQuery && (
                 <div className="flex items-center gap-1 mb-1">
                   <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    Search: "{searchQuery}"
+                    Search: &quot;{searchQuery}&quot;
                   </span>
                   <button
                     onClick={() => setSearchQuery('')}
