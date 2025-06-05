@@ -7,7 +7,7 @@
 class FileStorageService {
   constructor() {
     this.dbName = 'thesis-file-storage';
-    this.dbVersion = 1;
+    this.dbVersion = 3;
     this.storeName = 'files';
     this.db = null;
   }
