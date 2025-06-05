@@ -27,14 +27,42 @@ const PDFManager = ({
     loadStoredFiles();
   }, []);
 
+  // Helper function to load notes count with timeout protection
+  const loadNotesCountSafely = async (fileId, fileName) => {
+    try {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Notes loading timeout')), 5000)
+      );
+      
+      const notesPromise = notesService.getNotesForFile(fileId);
+      const notes = await Promise.race([notesPromise, timeoutPromise]);
+      return notes.length;
+    } catch (error) {
+      console.warn(`Failed to load notes count for ${fileName}, continuing without notes:`, error.message);
+      return 0;
+    }
+  };
+
   const loadStoredFiles = async () => {
+    console.log('PDFManager: Starting to load stored files...');
     try {
       setLoadingFiles(true);
-      await fileStorageService.initDB();
+      
+      // Add timeout protection for IndexedDB initialization
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('IndexedDB initialization timeout')), 10000)
+      );
+      
+      const initPromise = fileStorageService.initDB();
+      await Promise.race([initPromise, timeoutPromise]);
+      console.log('PDFManager: IndexedDB initialized successfully');
+
       const storedFiles = await fileStorageService.listFiles();
+      console.log('PDFManager: Found stored files:', storedFiles.length);
       
       // Filter only PDF files and get full file data
       const pdfMetadata = storedFiles.filter(storedFile => storedFile.type === 'application/pdf');
+      console.log('PDFManager: PDF files found:', pdfMetadata.length);
       const pdfFiles = [];
       
       for (const metadata of pdfMetadata) {
@@ -59,25 +87,44 @@ const PDFManager = ({
           console.error('Error loading file:', metadata.name, error);
         }
       }
-
+      
+      console.log('PDFManager: PDF files loaded successfully:', pdfFiles.length);
       setPdfFiles(pdfFiles);
       
-      // Load notes count for each file
+      // Load notes count for each file with timeout protection
+      console.log('PDFManager: Starting to load notes count...');
       const counts = new Map();
-      for (const file of pdfFiles) {
-        try {
-          const notes = await notesService.getNotesForFile(file.storedId || file.name);
-          counts.set(file.storedId || file.name, notes.length);
-        } catch (error) {
-          console.error('Error loading notes for file:', file.name, error);
+      
+      // Load notes in parallel with timeout protection for each
+      const notesPromises = pdfFiles.map(async (file) => {
+        const fileId = file.storedId || file.name;
+        const count = await loadNotesCountSafely(fileId, file.name);
+        return { fileId, count };
+      });
+      
+      try {
+        const notesResults = await Promise.all(notesPromises);
+        notesResults.forEach(({ fileId, count }) => {
+          counts.set(fileId, count);
+        });
+        console.log('PDFManager: Notes count loading completed');
+      } catch (error) {
+        console.warn('PDFManager: Some notes failed to load, continuing...', error);
+        // Set default counts for all files
+        pdfFiles.forEach(file => {
           counts.set(file.storedId || file.name, 0);
-        }
+        });
       }
+      
       setNotesCount(counts);
     } catch (error) {
-      console.error('Error loading stored files:', error);
+      console.error('PDFManager: Error loading stored files:', error);
+      // Reset to empty state on error
+      setPdfFiles([]);
+      setNotesCount(new Map());
     } finally {
       setLoadingFiles(false);
+      console.log('PDFManager: Finished loading stored files');
     }
   };
 
@@ -193,14 +240,46 @@ const PDFManager = ({
       return;
     }
 
+    console.log('PDFManager: Deleting file:', file.name);
     try {
       if (file.storedId) {
+        // Delete from storage
         await fileStorageService.deleteFile(file.storedId);
-        await loadStoredFiles(); // Refresh the list
+        console.log('PDFManager: File deleted from storage:', file.storedId);
+        
+        // Also clean up any associated notes
+        try {
+          await notesService.deleteNotesForFile(file.storedId);
+          console.log('PDFManager: Associated notes deleted');
+        } catch (notesError) {
+          console.warn('PDFManager: Could not delete associated notes:', notesError.message);
+          // Continue anyway - notes cleanup is not critical
+        }
+        
+        // Update local state immediately
+        setPdfFiles(prev => prev.filter(f => f.storedId !== file.storedId));
+        setNotesCount(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(file.storedId);
+          return newMap;
+        });
+        
+        // Clean up processed data cache
+        const fileKey = `${file.name}_${file.size}`;
+        setProcessedPdfs(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(fileKey);
+          return newMap;
+        });
+        
+        console.log('PDFManager: File deletion completed successfully');
       }
     } catch (error) {
-      console.error('Error deleting file:', error);
+      console.error('PDFManager: Error deleting file:', error);
       alert('Failed to delete file. Please try again.');
+      
+      // Refresh the list to ensure consistency
+      await loadStoredFiles();
     }
   };
 
