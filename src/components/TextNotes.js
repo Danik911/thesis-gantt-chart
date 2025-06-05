@@ -7,6 +7,8 @@ import remarkGfm from 'remark-gfm';
 import { FaTrash } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import ConfirmationDialog from './ConfirmationDialog';
+import AssociationSelector from './AssociationSelector';
+import { useAssociations } from '../contexts/AssociationContext';
 import unifiedNotesService from '../services/UnifiedNotesService';
 import 'draft-js/dist/Draft.css';
 import 'react-toastify/dist/ReactToastify.css';
@@ -29,6 +31,16 @@ const TextNotes = () => {
   const [showNotesList, setShowNotesList] = useState(true);
   const [availableFiles, setAvailableFiles] = useState([]);
   const [selectedFileForAssociation, setSelectedFileForAssociation] = useState(null);
+  const [associatedPdf, setAssociatedPdf] = useState(null);
+  
+  // Association context
+  const { 
+    createAssociation, 
+    removeAssociationByNoteId, 
+    getAssociationByNoteId,
+    loading: associationLoading,
+    error: associationError 
+  } = useAssociations();
   
   // Confirmation dialog state
   const [confirmationDialog, setConfirmationDialog] = useState({
@@ -176,9 +188,44 @@ const TextNotes = () => {
     setIsMarkdownMode(false);
     setSelectedFolder('General');
     setSelectedFileForAssociation(null);
+    setAssociatedPdf(null);
   };
 
-  const loadNote = (note) => {
+  // Handle PDF association
+  const handlePdfAssociation = async (pdf) => {
+    if (!currentNote?.id) {
+      toast.error('Please save the note first before associating with a PDF');
+      return;
+    }
+
+    try {
+      await createAssociation(currentNote.id, pdf.id, {
+        noteTitle: noteTitle,
+        pdfName: pdf.name
+      });
+      setAssociatedPdf(pdf);
+      toast.success(`Note associated with ${pdf.name}`);
+    } catch (error) {
+      console.error('Error creating association:', error);
+      toast.error('Failed to associate with PDF: ' + error.message);
+    }
+  };
+
+  // Handle clearing PDF association
+  const handleClearAssociation = async () => {
+    if (!currentNote?.id) return;
+
+    try {
+      await removeAssociationByNoteId(currentNote.id);
+      setAssociatedPdf(null);
+      toast.success('PDF association removed');
+    } catch (error) {
+      console.error('Error removing association:', error);
+      toast.error('Failed to remove association');
+    }
+  };
+
+  const loadNote = async (note) => {
     setCurrentNote(note);
     setNoteTitle(note.title);
     setSelectedTags(note.tags || []);
@@ -186,6 +233,25 @@ const TextNotes = () => {
     setIsMarkdownMode(!!note.markdownContent);
     setMarkdownContent(note.markdownContent || '');
     setSelectedFileForAssociation(note.fileId);
+    
+    // Load association if note has an ID
+    if (note.id) {
+      try {
+        const association = await getAssociationByNoteId(note.id);
+        if (association) {
+          // Find the PDF in available files
+          const pdf = availableFiles.find(f => f.id === association.pdfId);
+          setAssociatedPdf(pdf || null);
+        } else {
+          setAssociatedPdf(null);
+        }
+      } catch (error) {
+        console.error('Error loading association:', error);
+        setAssociatedPdf(null);
+      }
+    } else {
+      setAssociatedPdf(null);
+    }
     
     if (note.content) {
       try {
@@ -575,9 +641,9 @@ const TextNotes = () => {
                     <p className="text-xs text-gray-500">
                       {note.folder} • {new Date(note.updatedAt).toLocaleDateString()}
                     </p>
-                    {note.fileName && (
+                    {(note.fileName || associatedPdf) && (
                       <p className="text-xs text-blue-600">
-                        📎 {note.fileName}
+                        📎 {note.fileName || (currentNote?.id === note.id && associatedPdf ? associatedPdf.name : 'Associated PDF')}
                       </p>
                     )}
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -692,21 +758,25 @@ const TextNotes = () => {
               </div>
             </div>
 
-            {/* File Association */}
-            <div className="flex items-center gap-2">
-              <label>📎 File:</label>
-              <select
-                value={selectedFileForAssociation || ''}
-                onChange={(e) => setSelectedFileForAssociation(e.target.value || null)}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
-              >
-                <option value="">No file</option>
-                {availableFiles.map(file => (
-                  <option key={file.id} value={file.id}>
-                    {file.name}
-                  </option>
-                ))}
-              </select>
+            {/* PDF Association */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <AssociationSelector
+                currentPdfId={associatedPdf?.id}
+                onSelect={handlePdfAssociation}
+                onClear={handleClearAssociation}
+                disabled={!currentNote?.id}
+                placeholder={currentNote?.id ? "Associate with PDF..." : "Save note first"}
+                compact={true}
+              />
+              {associatedPdf && (
+                <a
+                  href={`#/pdf-manager`}
+                  className="text-blue-600 hover:text-blue-800 text-sm"
+                  title="View PDF"
+                >
+                  📄
+                </a>
+              )}
             </div>
 
             {/* Tags */}

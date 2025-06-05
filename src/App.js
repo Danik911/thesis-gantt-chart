@@ -4,6 +4,7 @@ import Navigation from './components/Navigation';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import { AuthProvider } from './contexts/AuthContext';
+import { AssociationProvider } from './contexts/AssociationContext';
 import './App.css';
 
 // Import IndexedDB reset utility for debugging
@@ -38,7 +39,8 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <Router>
+        <AssociationProvider>
+          <Router>
           <div className="App min-h-screen bg-gray-50 flex flex-col safe-area-top safe-area-bottom">
             <Navigation />
           
@@ -168,7 +170,8 @@ function App() {
           </Suspense>
           </main>
         </div>
-      </Router>
+          </Router>
+        </AssociationProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
