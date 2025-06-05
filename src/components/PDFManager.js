@@ -21,36 +21,48 @@ const PDFManager = ({
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [showNotesPanel, setShowNotesPanel] = useState(false);
   const [notesCount, setNotesCount] = useState(new Map());
-  const [initError, setInitError] = useState(null);
 
   // Load PDF files from IndexedDB storage
   useEffect(() => {
     loadStoredFiles();
   }, []);
 
-  const loadStoredFiles = async () => {
+  // Helper function to load notes count with timeout protection
+  const loadNotesCountSafely = async (fileId, fileName) => {
     try {
-      console.log('PDFManager: Starting to load stored files...');
-      setLoadingFiles(true);
-      setInitError(null);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Notes loading timeout')), 5000)
+      );
       
-      // Add timeout to prevent infinite loading
+      const notesPromise = notesService.getNotesForFile(fileId);
+      const notes = await Promise.race([notesPromise, timeoutPromise]);
+      return notes.length;
+    } catch (error) {
+      console.warn(`Failed to load notes count for ${fileName}, continuing without notes:`, error.message);
+      return 0;
+    }
+  };
+
+  const loadStoredFiles = async () => {
+    console.log('PDFManager: Starting to load stored files...');
+    try {
+      setLoadingFiles(true);
+      
+      // Add timeout protection for IndexedDB initialization
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('IndexedDB initialization timeout')), 10000)
       );
       
       const initPromise = fileStorageService.initDB();
-      
       await Promise.race([initPromise, timeoutPromise]);
       console.log('PDFManager: IndexedDB initialized successfully');
-      
+
       const storedFiles = await fileStorageService.listFiles();
       console.log('PDFManager: Found stored files:', storedFiles.length);
       
       // Filter only PDF files and get full file data
       const pdfMetadata = storedFiles.filter(storedFile => storedFile.type === 'application/pdf');
       console.log('PDFManager: PDF files found:', pdfMetadata.length);
-      
       const pdfFiles = [];
       
       for (const metadata of pdfMetadata) {
@@ -75,57 +87,45 @@ const PDFManager = ({
           console.error('Error loading file:', metadata.name, error);
         }
       }
-
-      setPdfFiles(pdfFiles);
-      console.log('PDFManager: PDF files loaded successfully:', pdfFiles.length);
       
-      // Load notes count for each file with proper error handling
-      await loadNotesCountSafely(pdfFiles);
-      console.log('PDFManager: Notes count loading completed');
+      console.log('PDFManager: PDF files loaded successfully:', pdfFiles.length);
+      setPdfFiles(pdfFiles);
+      
+      // Load notes count for each file with timeout protection
+      console.log('PDFManager: Starting to load notes count...');
+      const counts = new Map();
+      
+      // Load notes in parallel with timeout protection for each
+      const notesPromises = pdfFiles.map(async (file) => {
+        const fileId = file.storedId || file.name;
+        const count = await loadNotesCountSafely(fileId, file.name);
+        return { fileId, count };
+      });
+      
+      try {
+        const notesResults = await Promise.all(notesPromises);
+        notesResults.forEach(({ fileId, count }) => {
+          counts.set(fileId, count);
+        });
+        console.log('PDFManager: Notes count loading completed');
+      } catch (error) {
+        console.warn('PDFManager: Some notes failed to load, continuing...', error);
+        // Set default counts for all files
+        pdfFiles.forEach(file => {
+          counts.set(file.storedId || file.name, 0);
+        });
+      }
+      
+      setNotesCount(counts);
     } catch (error) {
       console.error('PDFManager: Error loading stored files:', error);
-      setInitError(error.message);
-      // Set empty files array on error to show empty state instead of infinite loading
+      // Reset to empty state on error
       setPdfFiles([]);
+      setNotesCount(new Map());
     } finally {
       setLoadingFiles(false);
       console.log('PDFManager: Finished loading stored files');
     }
-  };
-
-  const loadNotesCountSafely = async (files) => {
-    try {
-      // Add timeout to prevent hanging on notes service
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Notes loading timeout')), 5000)
-      );
-      
-      const notesPromise = loadNotesCount(files);
-      
-      await Promise.race([notesPromise, timeoutPromise]);
-    } catch (error) {
-      console.warn('PDFManager: Failed to load notes count, continuing without notes:', error.message);
-      // Set empty notes count for all files on error
-      const counts = new Map();
-      for (const file of files) {
-        counts.set(file.storedId || file.name, 0);
-      }
-      setNotesCount(counts);
-    }
-  };
-
-  const loadNotesCount = async (files) => {
-    const counts = new Map();
-    for (const file of files) {
-      try {
-        const notes = await notesService.getNotesForFile(file.storedId || file.name);
-        counts.set(file.storedId || file.name, notes.length);
-      } catch (error) {
-        console.error('Error loading notes for file:', file.name, error);
-        counts.set(file.storedId || file.name, 0);
-      }
-    }
-    setNotesCount(counts);
   };
 
   // Auto-select PDF if provided via props
@@ -240,311 +240,342 @@ const PDFManager = ({
       return;
     }
 
+    console.log('PDFManager: Deleting file:', file.name);
     try {
       if (file.storedId) {
+        // Delete from storage
         await fileStorageService.deleteFile(file.storedId);
-        // Also delete associated notes (but don't let it block the deletion)
+        console.log('PDFManager: File deleted from storage:', file.storedId);
+        
+        // Also clean up any associated notes
         try {
           await notesService.deleteNotesForFile(file.storedId);
+          console.log('PDFManager: Associated notes deleted');
         } catch (notesError) {
-          console.warn('Failed to delete notes for file, but file deleted successfully:', notesError);
+          console.warn('PDFManager: Could not delete associated notes:', notesError.message);
+          // Continue anyway - notes cleanup is not critical
         }
-        await loadStoredFiles(); // Refresh the list
-      }
-      
-      // Remove from current lists if it was the selected file
-      if (selectedPdfFile === file) {
-        setSelectedPdfFile(null);
-        setShowViewer(false);
-        setShowNotesPanel(false);
+        
+        // Update local state immediately
+        setPdfFiles(prev => prev.filter(f => f.storedId !== file.storedId));
+        setNotesCount(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(file.storedId);
+          return newMap;
+        });
+        
+        // Clean up processed data cache
+        const fileKey = `${file.name}_${file.size}`;
+        setProcessedPdfs(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(fileKey);
+          return newMap;
+        });
+        
+        console.log('PDFManager: File deletion completed successfully');
       }
     } catch (error) {
-      console.error('Error deleting file:', error);
+      console.error('PDFManager: Error deleting file:', error);
       alert('Failed to delete file. Please try again.');
+      
+      // Refresh the list to ensure consistency
+      await loadStoredFiles();
     }
   };
-
-  const handleNotesChanged = async () => {
-    // Reload notes count when notes are added/updated/deleted
-    try {
-      await loadNotesCountSafely(pdfFiles);
-    } catch (error) {
-      console.warn('Failed to reload notes count:', error);
-    }
-  };
-
-  const openNotesPanel = (file) => {
-    setSelectedPdfFile(file);
-    setShowNotesPanel(true);
-    setShowViewer(true);
-  };
-
-  const getFileNotesCount = (file) => {
-    return notesCount.get(file.storedId || file.name) || 0;
-  };
-
-  if (loadingFiles) {
-    return (
-      <div className={`pdf-manager flex items-center justify-center min-h-64 ${className}`}>
-        <div className="text-center">
-          <LoadingSpinner message="Loading PDF library..." />
-          {initError && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 text-sm font-medium">Initialization Error:</p>
-              <p className="text-red-500 text-sm">{initError}</p>
-              <button
-                onClick={() => {
-                  setInitError(null);
-                  loadStoredFiles();
-                }}
-                className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   if (showViewer && selectedPdfFile) {
     return (
-      <div className={`pdf-manager h-full flex ${className}`}>
-        {/* PDF Viewer */}
-        <div className={`pdf-viewer-container ${showNotesPanel ? 'flex-1' : 'w-full'}`}>
-          <div className="h-full flex flex-col">
-            {/* Viewer Header */}
-            <div className="viewer-header bg-gray-50 border-b border-gray-200 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => {
-                    setShowViewer(false);
-                    setShowNotesPanel(false);
-                    setSelectedPdfFile(null);
-                  }}
-                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Back to Library
-                </button>
-                
-                <div className="text-lg font-semibold text-gray-900">
-                  {selectedPdfFile.name}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowNotesPanel(!showNotesPanel)}
-                  className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                    showNotesPanel 
-                      ? 'bg-blue-500 text-white' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  Notes
-                  {getFileNotesCount(selectedPdfFile) > 0 && (
-                    <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-1 ml-1">
-                      {getFileNotesCount(selectedPdfFile)}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => downloadFile(selectedPdfFile)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                  Download
-                </button>
-              </div>
-            </div>
-
-            {/* PDF Viewer */}
-            <div className="flex-1 overflow-hidden">
-              <PDFViewer
-                file={selectedPdfFile}
-                processedData={getProcessedData(selectedPdfFile)}
-                onProcessingComplete={(result) => {
-                  const fileKey = `${selectedPdfFile.name}_${selectedPdfFile.size}`;
-                  setProcessedPdfs(prev => new Map(prev).set(fileKey, result));
-                }}
-              />
-            </div>
+      <div className={`pdf-manager-viewer ${className} h-full flex flex-col`}>
+        <div className="viewer-header bg-gray-100 border-b p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowViewer(false)}
+              className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              ← Back to Library
+            </button>
+            <h2 className="text-lg font-semibold">{selectedPdfFile.name}</h2>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowNotesPanel(!showNotesPanel)}
+              className={`px-3 py-1 text-sm rounded transition-colors flex items-center gap-2 ${
+                showNotesPanel 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Notes {notesCount.get(selectedPdfFile.storedId || selectedPdfFile.name) > 0 && 
+                `(${notesCount.get(selectedPdfFile.storedId || selectedPdfFile.name)})`
+              }
+            </button>
+            
+            <span className="text-sm text-gray-600">
+              {formatFileSize(selectedPdfFile.size)}
+            </span>
           </div>
         </div>
-
-        {/* Notes Panel */}
-        {showNotesPanel && (
-          <div className="w-96 h-full">
+        
+        <div className="viewer-content flex-1 flex">
+          <div className={`pdf-viewer-container ${showNotesPanel ? 'flex-1' : 'w-full'}`}>
+            <PDFViewer
+              file={selectedPdfFile}
+              onMetadataExtracted={(metadata) => {
+                console.log('Extracted metadata:', metadata);
+              }}
+              onTextExtracted={(textContent) => {
+                console.log('Extracted text content:', textContent);
+              }}
+              onError={(error) => {
+                console.error('PDF viewer error:', error);
+              }}
+              className="h-full"
+            />
+          </div>
+          
+          {showNotesPanel && (
             <PDFNotesPanel
               fileId={selectedPdfFile.storedId || selectedPdfFile.name}
               fileName={selectedPdfFile.name}
               onClose={() => setShowNotesPanel(false)}
-              onNotesChanged={handleNotesChanged}
-              className="h-full"
+              onNotesChanged={async () => {
+                // Refresh notes count for this file
+                try {
+                  const notes = await notesService.getNotesForFile(selectedPdfFile.storedId || selectedPdfFile.name);
+                  setNotesCount(prev => new Map(prev).set(selectedPdfFile.storedId || selectedPdfFile.name, notes.length));
+                } catch (error) {
+                  console.error('Error updating notes count:', error);
+                }
+              }}
+              className="w-80 h-full flex flex-col"
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`pdf-manager p-6 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">PDF Library</h2>
-          <p className="text-gray-600 mt-1">
-            {pdfFiles.length} {pdfFiles.length === 1 ? 'file' : 'files'} in your library
-          </p>
-          {initError && (
-            <p className="text-red-500 text-sm mt-1">
-              ⚠️ There was an issue loading the library. Some features may not work correctly.
-            </p>
-          )}
+    <div className={`pdf-manager ${className}`}>
+      <div className="pdf-manager-header mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">PDF Library</h2>
+          <button
+            onClick={loadStoredFiles}
+            disabled={loadingFiles}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {loadingFiles ? 'Loading...' : 'Refresh'}
+          </button>
         </div>
-      </div>
-
-      {/* Search */}
-      <div className="mb-6">
-        <div className="relative">
+        
+        {/* Search Bar */}
+        <div className="search-bar flex gap-2 mb-4">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && searchInAllPdfs()}
             placeholder="Search across all PDFs..."
-            className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="flex-1 px-3 py-2 border rounded-lg"
           />
           <button
             onClick={searchInAllPdfs}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            Search
           </button>
         </div>
 
         {/* Search Results */}
         {searchResults.length > 0 && (
-          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <h3 className="font-semibold text-yellow-800 mb-2">
-              Search Results ({searchResults.length} files)
+          <div className="search-results mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="font-semibold mb-2">
+              Search Results ({searchResults.reduce((sum, result) => sum + result.searchResult.totalMatches, 0)} matches)
             </h3>
-            <div className="space-y-2">
-              {searchResults.map((result, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{result.file.name}</span>
-                    <span className="text-yellow-700 ml-2">
-                      {result.searchResult.results.length} matches
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleFileSelect(result.file)}
-                    className="text-yellow-600 hover:text-yellow-800"
-                  >
-                    View
-                  </button>
+            {searchResults.map((result, index) => (
+              <div key={index} className="search-result-item mb-2 p-2 bg-white rounded border">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{result.file.name}</span>
+                  <span className="text-sm text-gray-600">
+                    {result.searchResult.totalMatches} matches
+                  </span>
                 </div>
-              ))}
-            </div>
+                <button
+                  onClick={() => handleFileSelect(result.file)}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Open and view matches →
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* PDF Files Grid */}
-      {pdfFiles.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-gray-400 text-6xl mb-4">📁</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No PDF files yet</h3>
-          <p className="text-gray-600">
-            Upload your first PDF file to get started with your research library.
-          </p>
+      {/* PDF Grid */}
+      {loadingFiles ? (
+        <div className="loading-state text-center py-12">
+          <LoadingSpinner size="large" />
+          <p className="text-gray-600 mt-4">Loading your PDF files...</p>
+        </div>
+      ) : pdfFiles.length === 0 ? (
+        <div className="empty-state text-center py-12">
+          <div className="text-gray-400 text-6xl mb-4">📄</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No PDF files found</h3>
+          <p className="text-gray-600 mb-4">Upload some PDF files to get started with PDF management.</p>
+          <a 
+            href="#/file-upload" 
+            className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Upload PDF Files
+          </a>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="pdf-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {pdfFiles.map((file, index) => {
-            const processed = getProcessedData(file);
-            const notesCount = getFileNotesCount(file);
+            const processedData = getProcessedData(file);
+            const readingProgress = processedData?.success 
+              ? pdfProcessingService.getReadingProgress(processedData.fileId).progress 
+              : 0;
 
             return (
               <div
-                key={`${file.name}_${index}`}
-                className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                key={index}
+                className="pdf-card bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer border"
+                onClick={() => handleFileSelect(file)}
               >
                 {/* Thumbnail */}
-                <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                  {processed?.thumbnail ? (
+                <div className="thumbnail-container h-48 bg-gray-100 rounded-t-lg flex items-center justify-center relative overflow-hidden">
+                  {processedData?.success && processedData.thumbnail ? (
                     <img
-                      src={processed.thumbnail}
+                      src={processedData.thumbnail.dataUrl}
                       alt={`${file.name} thumbnail`}
                       className="max-w-full max-h-full object-contain"
                     />
                   ) : (
-                    <div className="text-gray-400 text-4xl">📄</div>
+                    <div className="text-gray-400 text-center">
+                      <div className="text-4xl mb-2">📄</div>
+                      <div className="text-sm">PDF Preview</div>
+                    </div>
+                  )}
+                  
+                  {/* Processing Indicator */}
+                  {loading && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                      <LoadingSpinner />
+                    </div>
+                  )}
+                  
+                  {/* Reading Progress */}
+                  {readingProgress > 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 h-2 bg-gray-200">
+                      <div
+                        className="h-full bg-blue-500 transition-all duration-300"
+                        style={{ width: `${readingProgress}%` }}
+                      />
+                    </div>
                   )}
                 </div>
 
                 {/* File Info */}
                 <div className="p-4">
-                  <h3 className="font-medium text-gray-900 mb-2 truncate" title={file.name}>
+                  <h3 className="font-medium text-gray-900 truncate mb-1" title={file.name}>
                     {file.name}
                   </h3>
                   
-                  <div className="text-sm text-gray-500 space-y-1">
+                  <div className="text-sm text-gray-600 space-y-1">
                     <div>Size: {formatFileSize(file.size)}</div>
-                    <div>Added: {formatDate(file.uploadedAt)}</div>
-                    {processed?.pageCount && (
-                      <div>Pages: {processed.pageCount}</div>
+                    
+                    {processedData?.success && (
+                      <>
+                        <div>Pages: {processedData.metadata.pages}</div>
+                        <div>Author: {processedData.metadata.author}</div>
+                        {readingProgress > 0 && (
+                          <div>Progress: {readingProgress}%</div>
+                        )}
+                      </>
                     )}
+                    
+                    <div>Uploaded: {formatDate(file.uploadedAt || new Date(file.lastModified).toISOString())}</div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={() => handleFileSelect(file)}
-                      className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      View
-                    </button>
+                  {/* Action Buttons */}
+                  <div className="mt-3 space-y-2">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFileSelect(file);
+                        }}
+                        className="flex-1 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                      >
+                        Open
+                      </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFileSelect(file);
+                          setShowNotesPanel(true);
+                        }}
+                        className="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 flex items-center gap-1"
+                        title="View/Add Notes"
+                      >
+                        📝
+                        {notesCount.get(file.storedId || file.name) > 0 && (
+                          <span className="bg-purple-700 text-xs px-1 rounded-full">
+                            {notesCount.get(file.storedId || file.name)}
+                          </span>
+                        )}
+                      </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadFile(file);
+                        }}
+                        className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
+                        title="Download PDF"
+                      >
+                        📥
+                      </button>
+                    </div>
                     
-                    <button
-                      onClick={() => openNotesPanel(file)}
-                      className="px-3 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-1"
-                      title="View notes"
-                    >
-                      📝
-                      {notesCount > 0 && (
-                        <span className="bg-gray-600 text-white text-xs rounded-full px-2 py-1">
-                          {notesCount}
-                        </span>
+                    <div className="flex gap-2">
+                      {!processedData && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            processPdfFile(file);
+                          }}
+                          className="flex-1 px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+                        >
+                          Process
+                        </button>
                       )}
-                    </button>
-
-                    <button
-                      onClick={() => downloadFile(file)}
-                      className="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition-colors"
-                      title="Download"
-                    >
-                      ⬇️
-                    </button>
-                    
-                    <button
-                      onClick={() => deleteFile(file)}
-                      className="px-3 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors"
-                      title="Delete"
-                    >
-                      🗑️
-                    </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteFile(file);
+                        }}
+                        className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+                        title="Delete PDF"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -553,9 +584,11 @@ const PDFManager = ({
         </div>
       )}
 
-      {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <LoadingSpinner message="Processing PDF..." />
+      {/* Cache Stats (Development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-8 p-4 bg-gray-100 rounded-lg text-sm">
+          <h4 className="font-semibold mb-2">PDF Service Stats</h4>
+          <pre>{JSON.stringify(pdfProcessingService.getCacheStats(), null, 2)}</pre>
         </div>
       )}
     </div>
