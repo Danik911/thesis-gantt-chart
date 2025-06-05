@@ -5,6 +5,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import './App.css';
 
+// Import IndexedDB reset utility for debugging
+import './utils/indexedDBReset';
+
 // Lazy loaded components for better performance
 const WeeklyGanttChart = lazy(() => import('./components/WeeklyGanttChart'));
 const DailyProgress = lazy(() => import('./components/DailyProgress'));
