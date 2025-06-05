@@ -5,8 +5,11 @@ import { stateFromHTML } from 'draft-js-import-html';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { FaTrash } from 'react-icons/fa';
+import { toast, ToastContainer } from 'react-toastify';
+import ConfirmationDialog from './ConfirmationDialog';
 import unifiedNotesService from '../services/UnifiedNotesService';
 import 'draft-js/dist/Draft.css';
+import 'react-toastify/dist/ReactToastify.css';
 
 const TextNotes = () => {
   const [editorState, setEditorState] = useState(() => EditorState.createEmpty());
@@ -26,6 +29,17 @@ const TextNotes = () => {
   const [showNotesList, setShowNotesList] = useState(true);
   const [availableFiles, setAvailableFiles] = useState([]);
   const [selectedFileForAssociation, setSelectedFileForAssociation] = useState(null);
+  
+  // Confirmation dialog state
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    tagToDelete: null
+  });
+
+  // Loading state for tag deletion
+  const [isDeletingTag, setIsDeletingTag] = useState(false);
 
   // Character and word count
   const { characterCount, wordCount } = useMemo(() => {
@@ -243,8 +257,76 @@ const TextNotes = () => {
   };
 
   const handleDeleteTag = async (tagName) => {
-    // Placeholder for tag deletion - will be implemented in later subtasks
-    console.log('Delete tag:', tagName);
+    setConfirmationDialog({
+      isOpen: true,
+      title: 'Delete Tag',
+      message: `Are you sure you want to delete the tag "${tagName}"? This will remove it from all notes that use this tag.`,
+      tagToDelete: tagName
+    });
+  };
+
+  const confirmDeleteTag = async () => {
+    const tagName = confirmationDialog.tagToDelete;
+    
+    // Close dialog first
+    setConfirmationDialog({
+      isOpen: false,
+      title: '',
+      message: '',
+      tagToDelete: null
+    });
+
+    if (!tagName) return;
+
+    // Set loading state
+    setIsDeletingTag(true);
+
+    try {
+      // Call the actual deletion service
+      await unifiedNotesService.deleteTag(tagName);
+      
+      // Update local state immediately for better UX
+      setTags(prevTags => prevTags.filter(tag => tag !== tagName));
+      setSelectedTags(prevSelected => prevSelected.filter(tag => tag !== tagName));
+      
+      // Reload notes to reflect tag removal from notes
+      await loadNotes();
+      
+      // Show success notification
+      toast.success(`Tag "${tagName}" has been deleted successfully!`, {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      
+    } catch (error) {
+      console.error('Error deleting tag:', error);
+      
+      // Show error notification
+      toast.error(`Failed to delete tag "${tagName}". Please try again.`, {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } finally {
+      // Clear loading state
+      setIsDeletingTag(false);
+    }
+  };
+
+  const cancelDeleteTag = () => {
+    setConfirmationDialog({
+      isOpen: false,
+      title: '',
+      message: '',
+      tagToDelete: null
+    });
   };
 
   const handleKeyCommand = (command, editorState) => {
@@ -450,10 +532,19 @@ const TextNotes = () => {
                       e.stopPropagation();
                       handleDeleteTag(tag);
                     }}
-                    className="px-1 py-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-r transition-colors"
-                    title="Delete tag"
+                    disabled={isDeletingTag}
+                    className={`px-1 py-1 rounded-r transition-colors ${
+                      isDeletingTag 
+                        ? 'text-gray-400 cursor-not-allowed bg-gray-100' 
+                        : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                    }`}
+                    title={isDeletingTag ? "Deleting..." : "Delete tag"}
                   >
-                    <FaTrash className="w-3 h-3" />
+                    {isDeletingTag ? (
+                      <div className="w-3 h-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+                    ) : (
+                      <FaTrash className="w-3 h-3" />
+                    )}
                   </button>
                 </div>
               ))}
@@ -693,6 +784,31 @@ const TextNotes = () => {
           )}
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmationDialog.isOpen}
+        title={confirmationDialog.title}
+        message={confirmationDialog.message}
+        confirmText="Delete Tag"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteTag}
+        onCancel={cancelDeleteTag}
+      />
+
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 };

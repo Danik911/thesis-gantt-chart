@@ -352,22 +352,60 @@ class UnifiedNotesService {
   async deleteTag(tagName) {
     await this.initDB();
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction([this.tagsStoreName], 'readwrite');
-      const store = transaction.objectStore(this.tagsStoreName);
-      const index = store.index('name');
-      const request = index.get(tagName);
+    // First, get all notes that use this tag
+    const notesWithTag = await this.getNotes();
+    const notesToUpdate = notesWithTag.filter(note => 
+      note.tags && note.tags.includes(tagName)
+    );
 
-      request.onsuccess = () => {
-        if (request.result) {
-          const deleteRequest = store.delete(request.result.id);
-          deleteRequest.onsuccess = () => resolve();
-          deleteRequest.onerror = () => reject(new Error('Failed to delete tag'));
-        } else {
-          resolve(); // Tag doesn't exist
+    return new Promise((resolve, reject) => {
+      // Start a transaction for both tags and notes
+      const transaction = this.db.transaction([this.tagsStoreName, this.notesStoreName], 'readwrite');
+      const tagsStore = transaction.objectStore(this.tagsStoreName);
+      const notesStore = transaction.objectStore(this.notesStoreName);
+      
+      // Track completed operations
+      let operationsCompleted = 0;
+      const totalOperations = notesToUpdate.length + 1; // +1 for tag deletion
+
+      const checkCompletion = () => {
+        operationsCompleted++;
+        if (operationsCompleted === totalOperations) {
+          resolve();
         }
       };
-      request.onerror = () => reject(request.error);
+
+      // Update all notes to remove the tag
+      for (const note of notesToUpdate) {
+        const updatedTags = note.tags.filter(tag => tag !== tagName);
+        const updatedNote = { ...note, tags: updatedTags };
+        
+        const updateRequest = notesStore.put(updatedNote);
+        updateRequest.onsuccess = checkCompletion;
+        updateRequest.onerror = () => reject(new Error(`Failed to update note ${note.id}`));
+      }
+
+      // Delete the tag from tags store
+      const tagIndex = tagsStore.index('name');
+      const tagRequest = tagIndex.get(tagName);
+      
+      tagRequest.onsuccess = () => {
+        if (tagRequest.result) {
+          const deleteRequest = tagsStore.delete(tagRequest.result.id);
+          deleteRequest.onsuccess = checkCompletion;
+          deleteRequest.onerror = () => reject(new Error('Failed to delete tag'));
+        } else {
+          // Tag doesn't exist, just complete
+          checkCompletion();
+        }
+      };
+      
+      tagRequest.onerror = () => reject(new Error('Failed to find tag'));
+
+      // Handle case where there are no notes to update
+      if (notesToUpdate.length === 0) {
+        // Tag deletion will be the only operation
+      }
     });
   }
 
