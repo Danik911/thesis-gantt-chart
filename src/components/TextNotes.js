@@ -4,6 +4,7 @@ import { stateToHTML } from 'draft-js-export-html';
 import { stateFromHTML } from 'draft-js-import-html';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { FaTrash } from 'react-icons/fa';
 import unifiedNotesService from '../services/UnifiedNotesService';
 import 'draft-js/dist/Draft.css';
 
@@ -241,6 +242,11 @@ const TextNotes = () => {
     setSelectedTags(prev => prev.filter(t => t !== tag));
   };
 
+  const handleDeleteTag = async (tagName) => {
+    // Placeholder for tag deletion - will be implemented in later subtasks
+    console.log('Delete tag:', tagName);
+  };
+
   const handleKeyCommand = (command, editorState) => {
     const newState = RichUtils.handleKeyCommand(editorState, command);
     if (newState) {
@@ -428,17 +434,28 @@ const TextNotes = () => {
             <label className="block text-sm font-medium mb-2">Filter by Tags:</label>
             <div className="flex flex-wrap gap-1">
               {tags.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`px-2 py-1 text-xs rounded ${
-                    selectedTags.includes(tag)
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {tag}
-                </button>
+                <div key={tag} className="flex items-center bg-gray-100 rounded">
+                  <button
+                    onClick={() => toggleTag(tag)}
+                    className={`px-2 py-1 text-xs rounded-l ${
+                      selectedTags.includes(tag)
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTag(tag);
+                    }}
+                    className="px-1 py-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-r transition-colors"
+                    title="Delete tag"
+                  >
+                    <FaTrash className="w-3 h-3" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
