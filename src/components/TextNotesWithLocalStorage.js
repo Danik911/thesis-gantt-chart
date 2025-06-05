@@ -1,0 +1,554 @@
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Container, Row, Col, Card, Form, Button, Badge, InputGroup, Alert, Toast, ToastContainer } from 'react-bootstrap';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+import { 
+  saveNotesToStorage, 
+  loadNotesFromStorage, 
+  createDebouncedSave,
+  isLocalStorageAvailable,
+  getStorageUsage
+} from '../utils/notesStorage';
+
+// Task 15: Implement Notes Persistence System with Auto-Save and Manual Save
+// This component implements all requirements for localStorage-based notes persistence
+
+const TextNotesWithLocalStorage = () => {
+  // Subtask 15.1: Set Up State Management for Notes
+  const [notes, setNotes] = useState({
+    title: '',
+    content: '',
+    tags: [],
+    folders: [],
+    lastModified: Date.now()
+  });
+  
+  const [saveStatus, setSaveStatus] = useState('saved'); // 'saving', 'saved', 'error'
+  const [lastSaveTime, setLastSaveTime] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isMarkdownMode, setIsMarkdownMode] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+  const [folderInput, setFolderInput] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [storageInfo, setStorageInfo] = useState({ used: 0, total: 0, available: 0 });
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVariant, setToastVariant] = useState('success');
+  
+  // Refs for cleanup
+  const debouncedSaveRef = useRef(null);
+  const quillRef = useRef(null);
+  
+  // Subtask 15.3: Create localStorage Save/Load Functions
+  const handleSaveToStorage = useCallback(async (notesData) => {
+    try {
+      setSaveStatus('saving');
+      setErrorMessage('');
+      
+      const result = await saveNotesToStorage(notesData);
+      
+      if (result.success) {
+        setSaveStatus('saved');
+        setLastSaveTime(result.timestamp);
+        setStorageInfo(getStorageUsage());
+        
+        // Update last modified time
+        setNotes(prev => ({
+          ...prev,
+          lastModified: result.timestamp
+        }));
+      } else {
+        throw new Error(result.userMessage || 'Save failed');
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      setSaveStatus('error');
+      setErrorMessage(error.message || 'Failed to save notes');
+      
+      // Show error toast
+      setToastMessage(error.message || 'Failed to save notes');
+      setToastVariant('danger');
+      setShowToast(true);
+    }
+  }, []);
+  
+  const handleLoadFromStorage = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      const result = await loadNotesFromStorage();
+      
+      if (result.success && result.data) {
+        setNotes({
+          title: result.data.title || '',
+          content: result.data.content || '',
+          tags: result.data.tags || [],
+          folders: result.data.folders || [],
+          lastModified: result.data.lastModified || Date.now()
+        });
+        
+        if (result.timestamp) {
+          setLastSaveTime(result.timestamp);
+          setSaveStatus('saved');
+        }
+        
+        setStorageInfo(getStorageUsage());
+        
+        // Show success toast for loaded notes
+        if (result.data.title || result.data.content) {
+          setToastMessage('Notes loaded successfully');
+          setToastVariant('success');
+          setShowToast(true);
+        }
+      }
+    } catch (error) {
+      console.error('Load error:', error);
+      setErrorMessage('Failed to load saved notes');
+      
+      // Show error toast
+      setToastMessage('Failed to load saved notes');
+      setToastVariant('warning');
+      setShowToast(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+  
+  // Subtask 15.2: Implement Auto-Save with Debouncing
+  const debouncedSave = useMemo(() => {
+    return createDebouncedSave(handleSaveToStorage, 1500); // 1.5 second delay
+  }, [handleSaveToStorage]);
+  
+  // Store debounced function in ref for cleanup
+  useEffect(() => {
+    debouncedSaveRef.current = debouncedSave;
+    return () => {
+      if (debouncedSaveRef.current) {
+        debouncedSaveRef.current.cancel?.();
+      }
+    };
+  }, [debouncedSave]);
+  
+  // Auto-save when notes change
+  useEffect(() => {
+    if (!isLoading && (notes.title || notes.content)) {
+      debouncedSave(notes);
+    }
+  }, [notes, debouncedSave, isLoading]);
+  
+  // Subtask 15.6: Implement Notes Loading on App Startup
+  useEffect(() => {
+    handleLoadFromStorage();
+  }, []); // Empty dependency array for component mount only
+  
+  // Subtask 15.4: Add Manual Save Button
+  const handleManualSave = useCallback(async () => {
+    // Validate notes before saving
+    if (!notes.title.trim() && !notes.content.trim()) {
+      setToastMessage('Please add a title or content before saving');
+      setToastVariant('warning');
+      setShowToast(true);
+      return;
+    }
+    
+    try {
+      await handleSaveToStorage(notes);
+      
+      // Show success toast
+      setToastMessage('Notes saved manually');
+      setToastVariant('success');
+      setShowToast(true);
+    } catch (error) {
+      // Error handling is already done in handleSaveToStorage
+    }
+  }, [notes, handleSaveToStorage]);
+  
+  // Content change handlers
+  const handleTitleChange = useCallback((e) => {
+    setNotes(prev => ({
+      ...prev,
+      title: e.target.value
+    }));
+  }, []);
+  
+  const handleContentChange = useCallback((content) => {
+    setNotes(prev => ({
+      ...prev,
+      content: content
+    }));
+  }, []);
+  
+  // Tag management
+  const handleAddTag = useCallback(() => {
+    if (tagInput.trim() && !notes.tags.includes(tagInput.trim())) {
+      setNotes(prev => ({
+        ...prev,
+        tags: [...prev.tags, tagInput.trim()]
+      }));
+      setTagInput('');
+    }
+  }, [tagInput, notes.tags]);
+  
+  const handleRemoveTag = useCallback((tagToRemove) => {
+    setNotes(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }));
+  }, []);
+  
+  // Folder management
+  const handleAddFolder = useCallback(() => {
+    if (folderInput.trim() && !notes.folders.includes(folderInput.trim())) {
+      setNotes(prev => ({
+        ...prev,
+        folders: [...prev.folders, folderInput.trim()]
+      }));
+      setFolderInput('');
+    }
+  }, [folderInput, notes.folders]);
+  
+  const handleRemoveFolder = useCallback((folderToRemove) => {
+    setNotes(prev => ({
+      ...prev,
+      folders: prev.folders.filter(folder => folder !== folderToRemove)
+    }));
+  }, []);
+  
+  // Format storage size for display
+  const formatStorageSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+  
+  // Format timestamp for display
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'Never';
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+  };
+  
+  // Subtask 15.5: Create Save Status Indicators
+  const SaveStatusIndicator = () => {
+    const getStatusIcon = () => {
+      switch (saveStatus) {
+        case 'saving':
+          return (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+              <span className="text-warning">Saving...</span>
+            </>
+          );
+        case 'saved':
+          return (
+            <>
+              <i className="bi bi-check-circle-fill text-success me-2"></i>
+              <span className="text-success">Saved</span>
+              {lastSaveTime && (
+                <small className="text-muted ms-2">
+                  at {formatTimestamp(lastSaveTime)}
+                </small>
+              )}
+            </>
+          );
+        case 'error':
+          return (
+            <>
+              <i className="bi bi-exclamation-circle-fill text-danger me-2"></i>
+              <span className="text-danger">Error</span>
+              {errorMessage && (
+                <small className="text-danger ms-2">{errorMessage}</small>
+              )}
+            </>
+          );
+        default:
+          return (
+            <>
+              <i className="bi bi-circle text-secondary me-2"></i>
+              <span className="text-secondary">Ready</span>
+            </>
+          );
+      }
+    };
+    
+    return (
+      <div className="d-flex align-items-center small">
+        {getStatusIcon()}
+      </div>
+    );
+  };
+  
+  // Storage info component
+  const StorageInfo = () => {
+    if (!isLocalStorageAvailable()) {
+      return (
+        <Alert variant="warning" className="mt-3">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          localStorage is not available. Notes will not persist between sessions.
+        </Alert>
+      );
+    }
+    
+    const usagePercent = storageInfo.total > 0 ? (storageInfo.used / storageInfo.total) * 100 : 0;
+    const isNearLimit = usagePercent > 80;
+    
+    return (
+      <div className="mt-3">
+        <small className="text-muted">
+          Storage: {formatStorageSize(storageInfo.used)} used
+          {storageInfo.total > 0 && (
+            <> of {formatStorageSize(storageInfo.total)} ({usagePercent.toFixed(1)}%)</>
+          )}
+        </small>
+        {isNearLimit && (
+          <Alert variant="warning" className="mt-2 py-2">
+            <small>
+              <i className="bi bi-exclamation-triangle me-2"></i>
+              Storage space is running low. Consider deleting old notes.
+            </small>
+          </Alert>
+        )}
+      </div>
+    );
+  };
+  
+  // Rich text editor modules configuration
+  const quillModules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'color': [] }, { 'background': [] }],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'indent': '-1'}, { 'indent': '+1' }],
+      ['link', 'image'],
+      ['clean']
+    ]
+  };
+  
+  if (isLoading) {
+    return (
+      <Container className="mt-4">
+        <div className="text-center">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Loading your notes...</p>
+        </div>
+      </Container>
+    );
+  }
+  
+  return (
+    <Container className="mt-4">
+      <Row>
+        <Col lg={12}>
+          <Card>
+            <Card.Header className="d-flex justify-content-between align-items-center">
+              <h4 className="mb-0">
+                <i className="bi bi-journal-text me-2"></i>
+                Text Notes
+              </h4>
+              <div className="d-flex align-items-center gap-3">
+                <SaveStatusIndicator />
+                <Button 
+                  variant="primary" 
+                  size="sm" 
+                  onClick={handleManualSave}
+                  disabled={saveStatus === 'saving'}
+                >
+                  {saveStatus === 'saving' ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-save me-2"></i>
+                      Save Now
+                    </>
+                  )}
+                </Button>
+              </div>
+            </Card.Header>
+            
+            <Card.Body>
+              {/* Title Input */}
+              <Form.Group className="mb-3">
+                <Form.Label>Title</Form.Label>
+                <Form.Control
+                  type="text"
+                  value={notes.title}
+                  onChange={handleTitleChange}
+                  placeholder="Enter note title..."
+                  className="form-control-lg"
+                />
+              </Form.Group>
+              
+              {/* Content Editor Mode Toggle */}
+              <div className="mb-3">
+                <Form.Check 
+                  type="switch"
+                  id="markdown-switch"
+                  label="Markdown Mode"
+                  checked={isMarkdownMode}
+                  onChange={(e) => setIsMarkdownMode(e.target.checked)}
+                />
+              </div>
+              
+              {/* Content Editor */}
+              <Form.Group className="mb-3">
+                <Form.Label>Content</Form.Label>
+                {isMarkdownMode ? (
+                  <Form.Control
+                    as="textarea"
+                    rows={15}
+                    value={notes.content}
+                    onChange={(e) => handleContentChange(e.target.value)}
+                    placeholder="Write your notes in Markdown..."
+                    className="font-monospace"
+                  />
+                ) : (
+                  <ReactQuill
+                    ref={quillRef}
+                    theme="snow"
+                    value={notes.content}
+                    onChange={handleContentChange}
+                    modules={quillModules}
+                    placeholder="Write your notes here..."
+                    style={{ height: '300px', marginBottom: '50px' }}
+                  />
+                )}
+              </Form.Group>
+              
+              {/* Tags Section */}
+              <Form.Group className="mb-3">
+                <Form.Label>Tags</Form.Label>
+                <InputGroup className="mb-2">
+                  <Form.Control
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder="Add a tag..."
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                  />
+                  <Button variant="outline-secondary" onClick={handleAddTag}>
+                    <i className="bi bi-plus"></i>
+                  </Button>
+                </InputGroup>
+                <div className="d-flex flex-wrap gap-1">
+                  {notes.tags.map((tag, index) => (
+                    <Badge 
+                      key={index} 
+                      bg="primary" 
+                      className="d-flex align-items-center gap-1"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        style={{ fontSize: '0.7em' }}
+                        onClick={() => handleRemoveTag(tag)}
+                        aria-label="Remove tag"
+                      ></button>
+                    </Badge>
+                  ))}
+                </div>
+              </Form.Group>
+              
+              {/* Folders Section */}
+              <Form.Group className="mb-3">
+                <Form.Label>Folders</Form.Label>
+                <InputGroup className="mb-2">
+                  <Form.Control
+                    type="text"
+                    value={folderInput}
+                    onChange={(e) => setFolderInput(e.target.value)}
+                    placeholder="Add to folder..."
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddFolder())}
+                  />
+                  <Button variant="outline-secondary" onClick={handleAddFolder}>
+                    <i className="bi bi-plus"></i>
+                  </Button>
+                </InputGroup>
+                <div className="d-flex flex-wrap gap-1">
+                  {notes.folders.map((folder, index) => (
+                    <Badge 
+                      key={index} 
+                      bg="secondary" 
+                      className="d-flex align-items-center gap-1"
+                    >
+                      <i className="bi bi-folder me-1"></i>
+                      {folder}
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        style={{ fontSize: '0.7em' }}
+                        onClick={() => handleRemoveFolder(folder)}
+                        aria-label="Remove folder"
+                      ></button>
+                    </Badge>
+                  ))}
+                </div>
+              </Form.Group>
+              
+              {/* Error Display */}
+              {errorMessage && (
+                <Alert variant="danger" className="mt-3">
+                  <i className="bi bi-exclamation-circle me-2"></i>
+                  {errorMessage}
+                  <Button 
+                    variant="outline-danger" 
+                    size="sm" 
+                    className="ms-2"
+                    onClick={() => setErrorMessage('')}
+                  >
+                    Dismiss
+                  </Button>
+                </Alert>
+              )}
+              
+              {/* Storage Information */}
+              <StorageInfo />
+              
+              {/* Notes Statistics */}
+              <div className="mt-3 pt-3 border-top">
+                <Row className="text-muted small">
+                  <Col md={6}>
+                    <strong>Characters:</strong> {notes.content.length.toLocaleString()}
+                  </Col>
+                  <Col md={6}>
+                    <strong>Last Modified:</strong> {formatTimestamp(notes.lastModified)}
+                  </Col>
+                </Row>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+      
+      {/* Toast Notifications */}
+      <ToastContainer position="top-end" className="p-3">
+        <Toast 
+          show={showToast} 
+          onClose={() => setShowToast(false)}
+          delay={3000}
+          autohide
+          bg={toastVariant}
+        >
+          <Toast.Header closeButton={false}>
+            <i className={`bi bi-${toastVariant === 'success' ? 'check-circle' : toastVariant === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2`}></i>
+            <strong className="me-auto">Notes System</strong>
+            <small className="text-muted">just now</small>
+          </Toast.Header>
+          <Toast.Body className={toastVariant === 'success' ? 'text-white' : ''}>
+            {toastMessage}
+          </Toast.Body>
+        </Toast>
+      </ToastContainer>
+    </Container>
+  );
+};
+
+export default TextNotesWithLocalStorage;
