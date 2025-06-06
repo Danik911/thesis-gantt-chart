@@ -103,7 +103,8 @@ const TextNotesWithLocalStorage = () => {
       if (localResult.success) {
         // Also save to Firebase
         try {
-          const firebaseData = {
+          // Base data for both new and existing notes
+          const baseFirebaseData = {
             title: notesData.title,
             content: notesData.content,
             tags: notesData.tags || [],
@@ -111,17 +112,20 @@ const TextNotesWithLocalStorage = () => {
             lastModified: localResult.timestamp,
             type: 'standalone',
             userId: 'anonymous', // For now, using anonymous user
-            createdAt: currentNoteId ? undefined : new Date(),
             updatedAt: new Date()
           };
 
           if (currentNoteId) {
-            // Update existing note
+            // Update existing note - don't include createdAt to preserve original value
             const noteRef = doc(db, 'notes', currentNoteId);
-            await updateDoc(noteRef, firebaseData);
+            await updateDoc(noteRef, baseFirebaseData);
           } else {
-            // Create new note
-            const docRef = await addDoc(collection(db, 'notes'), firebaseData);
+            // Create new note - include createdAt for new documents
+            const newNoteData = {
+              ...baseFirebaseData,
+              createdAt: new Date()
+            };
+            const docRef = await addDoc(collection(db, 'notes'), newNoteData);
             setCurrentNoteId(docRef.id);
           }
           
