@@ -1,4 +1,7 @@
 /**
+ * @deprecated This service is deprecated and will be removed in a future version. 
+ * Please use firestoreService for all note-related operations.
+ * 
  * NotesService - Client-side notes storage for PDF files using IndexedDB
  * This service provides notes and annotation capabilities for PDF files
  */

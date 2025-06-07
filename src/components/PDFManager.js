@@ -3,7 +3,7 @@ import PDFViewer from './PDFViewer';
 import PDFNotesPanel from './PDFNotesPanel';
 import pdfProcessingService from '../services/pdfProcessingService';
 import fileStorageService from '../services/FileStorageService';
-import notesService from '../services/NotesService';
+import firestoreService from '../services/firestoreService';
 import LoadingSpinner from './LoadingSpinner';
 
 const PDFManager = ({ 
@@ -34,8 +34,13 @@ const PDFManager = ({
         setTimeout(() => reject(new Error('Notes loading timeout')), 5000)
       );
       
-      const notesPromise = notesService.getNotesForFile(fileId);
-      const notes = await Promise.race([notesPromise, timeoutPromise]);
+      const notesPromise = firestoreService.readAll('notes', { where: { field: 'fileId', operator: '==', value: fileId } });
+      const { data: notes, error } = await Promise.race([notesPromise, timeoutPromise]);
+      
+      if (error) {
+        throw new Error(error);
+      }
+      
       return notes.length;
     } catch (error) {
       console.warn(`Failed to load notes count for ${fileName}, continuing without notes:`, error.message);
@@ -247,12 +252,18 @@ const PDFManager = ({
         await fileStorageService.deleteFile(file.storedId);
         console.log('PDFManager: File deleted from storage:', file.storedId);
         
-        // Also clean up any associated notes
+        // Also clean up any associated notes from Firestore
         try {
-          await notesService.deleteNotesForFile(file.storedId);
-          console.log('PDFManager: Associated notes deleted');
+          const { data: notes, error } = await firestoreService.readAll('notes', { where: { field: 'fileId', operator: '==', value: file.storedId } });
+          if (error) throw new Error(error);
+
+          const batch = firestoreService.batch();
+          notes.forEach(note => batch.delete('notes', note.id));
+          await batch.commit();
+          
+          console.log('PDFManager: Associated notes deleted from Firestore');
         } catch (notesError) {
-          console.warn('PDFManager: Could not delete associated notes:', notesError.message);
+          console.warn('PDFManager: Could not delete associated notes from Firestore:', notesError.message);
           // Continue anyway - notes cleanup is not critical
         }
         
@@ -345,7 +356,8 @@ const PDFManager = ({
               onNotesChanged={async () => {
                 // Refresh notes count for this file
                 try {
-                  const notes = await notesService.getNotesForFile(selectedPdfFile.storedId || selectedPdfFile.name);
+                  const { data: notes, error } = await firestoreService.readAll('notes', { where: { field: 'fileId', operator: '==', value: selectedPdfFile.storedId || selectedPdfFile.name } });
+                  if (error) throw new Error(error);
                   setNotesCount(prev => new Map(prev).set(selectedPdfFile.storedId || selectedPdfFile.name, notes.length));
                 } catch (error) {
                   console.error('Error updating notes count:', error);
