@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import { AuthProvider } from './contexts/AuthContext';
 import { AssociationProvider } from './contexts/AssociationContext';
+import { NotesProvider } from './contexts/NotesContext';
 import './App.css';
 
 // Import IndexedDB reset utility for debugging
@@ -14,6 +15,7 @@ import './utils/indexedDBReset';
 const WeeklyGanttChart = lazy(() => import('./components/WeeklyGanttChart'));
 const DailyProgress = lazy(() => import('./components/DailyProgress'));
 const TextNotesWithLocalStorage = lazy(() => import('./components/TextNotesWithLocalStorage'));
+const NotesDashboard = lazy(() => import('./components/NotesDashboard'));
 const FileUploadPage = lazy(() => import('./components/FileUploadPage'));
 const GitHubFileManager = lazy(() => import('./components/GitHubFileManager'));
 const PDFManager = lazy(() => import('./components/PDFManager'));
@@ -40,7 +42,8 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <AssociationProvider>
-          <Router>
+          <NotesProvider>
+            <Router>
           <div className="App min-h-screen bg-gray-50 flex flex-col safe-area-top safe-area-bottom">
             <Navigation />
           
@@ -76,7 +79,7 @@ function App() {
                 element={
                   <ErrorBoundary>
                     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-                      <TextNotesWithLocalStorage />
+                      <NotesDashboard />
                     </div>
                   </ErrorBoundary>
                 } 
@@ -171,6 +174,7 @@ function App() {
           </main>
         </div>
           </Router>
+          </NotesProvider>
         </AssociationProvider>
       </AuthProvider>
     </ErrorBoundary>
