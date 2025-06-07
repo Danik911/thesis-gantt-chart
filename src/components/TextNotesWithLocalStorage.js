@@ -243,10 +243,14 @@ const TextNotesWithLocalStorage = () => {
     }
   }, []);
   
+  // Store the save function in a ref to avoid recreating debounced function
+  const saveToStorageRef = useRef(handleSaveToStorage);
+  saveToStorageRef.current = handleSaveToStorage;
+  
   // Subtask 15.2: Implement Auto-Save with Debouncing
   const debouncedSave = useMemo(() => {
-    return createDebouncedSave(handleSaveToStorage, 3000); // Increased to 3 second delay
-  }, [handleSaveToStorage]);
+    return createDebouncedSave((...args) => saveToStorageRef.current(...args), 3000); // Increased to 3 second delay
+  }, []); // No dependencies to prevent recreation
   
   // Store debounced function in ref for cleanup
   useEffect(() => {
@@ -258,18 +262,13 @@ const TextNotesWithLocalStorage = () => {
     };
   }, [debouncedSave]);
   
-  // Auto-save when notes change - with better dependency management
-  const notesStringified = useMemo(() => 
-    JSON.stringify({ title: notes.title, content: notes.content, tags: notes.tags, folders: notes.folders }), 
-    [notes.title, notes.content, notes.tags, notes.folders]
-  );
-  
+  // Auto-save when notes change - simplified approach
   useEffect(() => {
     if (!isLoading && (notes.title || notes.content)) {
       console.log('Auto-save triggered for notes change at', new Date().toLocaleTimeString());
       debouncedSave(notes);
     }
-  }, [notesStringified, debouncedSave, isLoading, notes]);
+  }, [notes.title, notes.content, notes.tags, notes.folders, debouncedSave, isLoading]);
   
   // Subtask 15.6: Implement Notes Loading on App Startup
   useEffect(() => {
