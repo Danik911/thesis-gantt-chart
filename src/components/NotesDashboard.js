@@ -500,7 +500,7 @@ const NotesDashboard = () => {
               {searchQuery && (
                 <span className="inline-flex items-center bg-purple-100 text-purple-800 text-sm px-3 py-1 rounded-full">
                   <FaSearch className="mr-1" />
-                  "{searchQuery}"
+                  &quot;{searchQuery}&quot;
                   <button
                     onClick={() => setSearchQuery('')}
                     className="ml-2 text-purple-600 hover:text-purple-800"
