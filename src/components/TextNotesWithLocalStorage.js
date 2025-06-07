@@ -15,8 +15,7 @@ import {
   isLocalStorageAvailable,
   getStorageUsage
 } from '../utils/notesStorage';
-// Debounce hook import
-import useDebounce from '../hooks/useDebounce';
+
 
 // Task 15: Implement Notes Persistence System with Auto-Save and Manual Save
 // Task 16: Implement File Association System for Notes and PDFs
@@ -244,43 +243,30 @@ const TextNotesWithLocalStorage = () => {
     }
   }, []);
   
-  // Subtask 15.2: Implement Auto-Save with Debouncing
-  // Create a serialized version of notes for debouncing to prevent object recreation issues
-  const notesForDebouncing = useMemo(() => {
-    return JSON.stringify({
-      title: notes.title,
-      content: notes.content, 
-      tags: notes.tags,
-      folders: notes.folders
-    });
-  }, [notes.title, notes.content, notes.tags, notes.folders]);
-  
-  // Use the debounce hook with a 2-second delay
-  const debouncedNotesString = useDebounce(notesForDebouncing, 2000);
-  
-  // Auto-save effect - only triggers when debounced value changes
-  useEffect(() => {
-    // Skip if still loading or if notes are empty
-    if (isLoading) return;
-    
-    try {
-      const debouncedNotes = JSON.parse(debouncedNotesString);
-      
-      // Only save if there's actual content
-      if (debouncedNotes.title.trim() || debouncedNotes.content.trim()) {
-        console.log('Auto-save triggered for notes change at', new Date().toLocaleTimeString());
-        handleSaveToStorage(notes);
-      }
-    } catch (error) {
-      console.error('Error parsing debounced notes:', error);
-    }
-  }, [debouncedNotesString, isLoading, notes, handleSaveToStorage]);
+  // Subtask 15.2: Manual Save Only (Auto-save removed for performance)
+  // Auto-save functionality has been removed to prevent excessive Firebase writes
+  // Users can save manually using the "Save Now" button or Ctrl+S shortcut
   
   // Subtask 15.6: Implement Notes Loading on App Startup
   useEffect(() => {
     handleLoadFromStorage();
     loadAvailableFiles();
   }, []); // Empty dependency array for component mount only
+
+  // Add keyboard shortcut for manual save (Ctrl+S)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.ctrlKey && event.key === 's') {
+        event.preventDefault(); // Prevent browser save dialog
+        handleManualSave();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleManualSave]);
 
   // Load associations when note ID or available files change
   useEffect(() => {
@@ -497,14 +483,15 @@ const TextNotesWithLocalStorage = () => {
               <h4 className="mb-0">
                 <i className="bi bi-journal-text me-2"></i>
                 Text Notes
+                <small className="text-muted ms-2">(Manual Save Only)</small>
               </h4>
               <div className="d-flex align-items-center gap-3">
                 <SaveStatusIndicator />
                 <Button 
                   variant="primary" 
-                  size="sm" 
                   onClick={handleManualSave}
                   disabled={saveStatus === 'saving'}
+                  title="Save notes (Ctrl+S)"
                 >
                   {saveStatus === 'saving' ? (
                     <>
@@ -514,7 +501,7 @@ const TextNotesWithLocalStorage = () => {
                   ) : (
                     <>
                       <i className="bi bi-save me-2"></i>
-                      Save Now
+                      Save Notes (Ctrl+S)
                     </>
                   )}
                 </Button>
