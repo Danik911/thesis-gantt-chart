@@ -7,13 +7,13 @@ import { getStorage } from 'firebase/storage';
 // Firebase configuration object
 // These values should be replaced with your actual Firebase project config
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "AIzaSyAAkjD9jUaXmYA_lugAscCsk58V8V97wFw",
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "gantt-chart-ea44e.firebaseapp.com",
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "gantt-chart-ea44e",
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "gantt-chart-ea44e.firebasestorage.app",
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "202044041438",
-  appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:202044041438:web:8e7e72fa0a74ac68f03a4f",
-  measurementId: "G-SE6QYE382R"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase

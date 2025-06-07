@@ -1,0 +1,152 @@
+# Task ID: 16
+# Title: Implement File Association System for Notes and PDFs
+# Status: pending
+# Dependencies: 9, 15
+# Priority: high
+# Description: Create a unified system that allows notes to be associated with uploaded PDF files, providing a single source of truth accessible from both the text notes tab and PDF manager.
+# Details:
+1. Design data structure:
+   - Create a new 'associations' collection in Firestore
+   - Structure: { id: string, noteId: string, pdfId: string, createdAt: timestamp, lastModified: timestamp }
+
+2. Update Notes component:
+   - Add a dropdown component for PDF selection using react-select
+   - Implement function to create/update associations when a PDF is selected
+   - Display associated PDF information in the note view
+
+3. Update PDF Manager component:
+   - Add visual indicators (e.g., badge or icon) for PDFs with associated notes
+   - Implement a function to display associated notes when a PDF is selected
+
+4. Create AssociationService:
+   - Implement CRUD operations for associations (create, read, update, delete)
+   - Add methods for querying associations by noteId or pdfId
+
+5. Update state management:
+   - Create a new slice in Redux store for managing associations
+   - Implement actions and reducers for association operations
+
+6. Implement bidirectional navigation:
+   - Add 'View PDF' button in Notes component that opens the associated PDF
+   - Add 'View Notes' button in PDF viewer that displays associated notes
+
+7. Enhance search functionality:
+   - Update search logic to include filtering by associated files
+   - Implement UI for selecting file association filters
+
+8. Implement association metadata tracking:
+   - Add createdAt and lastModified fields to association objects
+   - Update these fields appropriately when associations are created or modified
+
+9. Create AssociationSelector component:
+   - Develop a reusable component for selecting PDFs to associate
+   - Include search and filter functionality within the selector
+
+10. Update routes and navigation:
+    - Ensure proper routing between notes and PDF viewer when navigating through associations
+    - Update URL structure to include association information if necessary
+
+11. Optimize performance:
+    - Implement lazy loading for associated content
+    - Use memoization for expensive computations related to associations
+
+12. Handle edge cases:
+    - Implement logic for handling deleted notes or PDFs with existing associations
+    - Add conflict resolution for simultaneous edits to associations
+
+# Test Strategy:
+1. Unit tests:
+   - Test AssociationService methods for CRUD operations
+   - Verify correct state updates in Redux store for association actions
+   - Test utility functions for handling association metadata
+
+2. Integration tests:
+   - Verify correct data flow between Notes and PDF Manager components
+   - Test bidirectional navigation between associated notes and PDFs
+   - Ensure proper updates to UI when associations are created, modified, or deleted
+
+3. UI/UX tests:
+   - Verify visual indicators for associated files are displayed correctly
+   - Test responsiveness and usability of the AssociationSelector component
+   - Ensure search and filter functionality works with file associations
+
+4. Performance tests:
+   - Measure and optimize load times for components with associated content
+   - Test system behavior with a large number of associations
+
+5. Edge case testing:
+   - Verify proper handling of deleted notes or PDFs with existing associations
+   - Test conflict resolution for simultaneous edits to associations
+
+6. End-to-end tests:
+   - Create test scenarios that cover the entire workflow of creating, viewing, and managing associated notes and PDFs
+   - Verify data consistency across different views and components
+
+7. Browser compatibility tests:
+   - Test the file association system across different browsers and devices
+
+8. Accessibility testing:
+   - Ensure all new UI elements related to file associations are accessible
+   - Test keyboard navigation for association-related features
+
+9. Security testing:
+   - Verify that association data is properly secured and only accessible to authorized users
+   - Test for potential vulnerabilities in the association system
+
+10. User acceptance testing:
+    - Conduct user testing sessions to gather feedback on the usability and effectiveness of the file association system
+
+# Subtasks:
+## 1. Design Data Structure for File-Note Associations [pending]
+### Dependencies: None
+### Description: Create data models to link notes with PDF files
+### Details:
+- Design normalized data structure for notes and files
+- Create association mapping between note IDs and file IDs
+- Include metadata fields (creation date, last modified)
+- Plan schema for localStorage storage
+- Design interface types for TypeScript if applicable
+
+## 2. Create Context API for Shared State [pending]
+### Dependencies: 16.1
+### Description: Implement React Context for sharing notes and file data across components
+### Details:
+- Create NotesContext using React.createContext
+- Implement NotesProvider component with state management
+- Include functions for managing notes and file associations
+- Provide actions for CRUD operations on notes and associations
+- Make context available to both text-notes and pdf-manager routes
+
+## 3. Add File Selection Component for Notes [pending]
+### Dependencies: 16.2
+### Description: Create UI component to associate notes with PDF files
+### Details:
+- Build dropdown/selector component for PDF files
+- List available PDF files from the library
+- Include search/filter functionality for large file lists
+- Show file thumbnails or icons for better UX
+- Allow multiple file associations per note
+- Add 'No file associated' option
+
+## 4. Implement Bidirectional Association Display [pending]
+### Dependencies: 16.3
+### Description: Show associated notes in PDF manager and associated files in notes
+### Details:
+- Add notes indicator/count in PDF manager for files with notes
+- Display associated file names in text notes interface
+- Create clickable links between notes and files
+- Implement tooltip showing association details
+- Add visual badges/icons to indicate associations
+- Ensure real-time updates when associations change
+
+## 5. Add Search and Filter by File Associations [pending]
+### Dependencies: 16.4
+### Description: Implement search functionality for notes based on associated files
+### Details:
+- Add search input to filter notes by associated file names
+- Implement filter dropdown to show notes for specific files
+- Create 'Show only notes with file associations' toggle
+- Add 'Show orphaned notes' (notes without file associations) option
+- Ensure search works with partial file names
+- Include file association metadata in search results
+

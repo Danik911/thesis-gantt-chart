@@ -1,0 +1,98 @@
+# Task ID: 8
+# Title: Setup React + Firebase Architecture for Academic Research Tool
+# Status: done
+# Dependencies: 1, 2
+# Priority: high
+# Description: Refactor the existing GANTT chart application to use modern React.js architecture with Firebase backend integration, preserving existing functionality while setting up a new development environment.
+# Details:
+1. Create new React application:
+   - Use Create React App or Vite with TypeScript template
+   - Install necessary dependencies: react-router-dom, firebase, @reduxjs/toolkit (if using Redux)
+
+2. Set up Firebase project:
+   - Create a new Firebase project in the Firebase console
+   - Enable Firestore, Storage, and Authentication services
+   - Generate and save Firebase configuration keys
+
+3. Implement Firebase integration:
+   - Create a firebase.ts file to initialize Firebase app and export service instances
+   - Implement authentication methods (signIn, signOut, onAuthStateChanged)
+   - Create Firestore utility functions for CRUD operations
+
+4. Set up routing structure:
+   - Implement React Router with routes for main pages (e.g., Dashboard, GANTT Chart, Settings)
+   - Create layout components (e.g., Header, Sidebar, Footer)
+
+5. Migrate GANTT chart functionality:
+   - Convert existing GANTT chart code to React components
+   - Implement hooks for state management (useState, useEffect)
+   - Ensure all existing features are preserved (row editing, chart manipulation)
+
+6. Implement state management:
+   - Set up Redux store with slices for different data types (user, projects, tasks)
+   - Create actions and reducers for GANTT chart operations
+   - Implement React-Redux hooks (useSelector, useDispatch) in components
+
+7. Create foundational components:
+   - Implement reusable UI components (Button, Input, Modal, etc.)
+   - Create service layer for API calls and data transformations
+
+8. Ensure responsive design:
+   - Implement CSS modules or styled-components for component-specific styles
+   - Use flexbox or grid for responsive layouts
+   - Test and adjust layouts for various screen sizes
+
+9. Set up development tools:
+   - Configure ESLint and Prettier for code quality
+   - Set up Jest and React Testing Library for unit tests
+   - Implement Storybook for component documentation (optional)
+
+10. Preserve GitHub Pages deployment:
+    - Update build scripts to output to the correct directory for GitHub Pages
+    - Modify GitHub Actions workflow to build and deploy the React app
+
+# Test Strategy:
+1. Unit Testing:
+   - Write unit tests for all new React components using Jest and React Testing Library
+   - Test Firebase service functions with mock Firebase instances
+   - Ensure all existing GANTT chart functionalities have corresponding unit tests
+
+2. Integration Testing:
+   - Test the interaction between React components and Firebase services
+   - Verify that data flows correctly between the frontend and backend
+   - Test authentication flow and protected routes
+
+3. End-to-End Testing:
+   - Use a tool like Cypress to write E2E tests for critical user flows
+   - Test the complete GANTT chart functionality in the new React environment
+   - Verify that row editing and other existing features work as expected
+
+4. Performance Testing:
+   - Use React DevTools profiler to identify and optimize performance bottlenecks
+   - Test application load time and runtime performance
+   - Verify that Firebase queries are efficient and don't cause unnecessary re-renders
+
+5. Cross-browser Testing:
+   - Test the application in multiple browsers (Chrome, Firefox, Safari, Edge)
+   - Ensure consistent functionality and appearance across browsers
+
+6. Responsive Design Testing:
+   - Test the application on various device sizes and orientations
+   - Verify that all features are accessible and usable on mobile devices
+
+7. Accessibility Testing:
+   - Use tools like axe-core to check for accessibility issues
+   - Ensure proper keyboard navigation and screen reader compatibility
+
+8. Deployment Testing:
+   - Verify that the application builds and deploys correctly to GitHub Pages
+   - Test the deployed version to ensure all features work in the production environment
+
+9. User Acceptance Testing:
+   - Conduct a UAT session with stakeholders to ensure the new architecture meets requirements
+   - Gather feedback on user experience and any potential issues
+
+10. Security Testing:
+    - Verify that Firebase security rules are properly implemented
+    - Test authentication and authorization mechanisms
+    - Ensure that sensitive data is properly protected

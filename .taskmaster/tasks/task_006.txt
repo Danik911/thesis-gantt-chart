@@ -1,0 +1,23 @@
+# Task ID: 6
+# Title: Implement Auto-save Functionality
+# Status: done
+# Dependencies: 2
+# Priority: medium
+# Description: Develop an auto-save feature to preserve all changes made to the GANTT chart.
+# Details:
+1. Implement a debounce function to limit save frequency
+2. Create a saveState function to store GANTT chart data
+3. Utilize localStorage for client-side storage
+4. Implement data compression for efficient storage
+5. Add error handling for storage limits
+6. Create a recovery mechanism for unsaved changes
+7. Implement visual indicators for save status
+8. Add manual save option as a fallback
+9. Ensure auto-save works across all edit operations
+
+# Test Strategy:
+1. Unit test saveState function
+2. Test debounce functionality
+3. Verify data compression and decompression
+4. Test recovery mechanism
+5. Performance testing for frequent saves

@@ -1,0 +1,146 @@
+# Task ID: 17
+# Title: Enhance Text Notes System with Complete Organization and File Association Features
+# Status: pending
+# Dependencies: 15
+# Priority: high
+# Description: Develop a comprehensive enhancement to the text notes functionality, addressing current limitations and providing a complete note management experience with organization, file association, and Firebase integration.
+# Details:
+1. Notes Overview Dashboard:
+   - Implement a grid/list view component for displaying all saved notes
+   - Add search functionality using Firebase full-text search or a client-side search library
+   - Implement sorting and filtering options (by date, title, tags, folders)
+   - Use React Context for state management of notes data
+
+2. Complete Folder Management:
+   - Design a hierarchical folder structure in Firestore
+   - Implement CRUD operations for folders (Create, Read, Update, Delete)
+   - Develop a tree-view component for folder navigation
+   - Add drag-and-drop functionality for organizing notes within folders
+
+3. Enhanced Tag System:
+   - Implement full CRUD operations for tags
+   - Develop an autocomplete component for tag input
+   - Create a tag cloud visualization component
+   - Implement bulk tag operations (add/remove tags to multiple notes)
+
+4. Fixed File Association:
+   - Refactor the existing PDF library integration
+   - Implement bidirectional linking between notes and PDF files
+   - Store file associations in Firestore with proper indexing
+   - Develop a UI component for managing file associations
+
+5. Firebase Storage Optimization:
+   - Redesign Firestore data structure for efficient querying
+   - Implement proper indexing for frequently accessed fields
+   - Set up Firebase Security Rules for data protection
+   - Use Firebase SDK for real-time updates and offline persistence
+
+6. User Interface Enhancements:
+   - Implement keyboard shortcuts for common actions (new note, save, navigate)
+   - Develop an export functionality for backing up notes (JSON format)
+   - Create a settings panel for user preferences (theme, default view, etc.)
+
+7. Performance Optimization:
+   - Implement lazy loading for notes list
+   - Use React.memo and useMemo for expensive computations
+   - Optimize Firebase queries with pagination and limiting
+
+8. Cross-browser Compatibility:
+   - Test and ensure functionality across major browsers (Chrome, Firefox, Safari, Edge)
+   - Implement necessary polyfills or fallbacks for older browsers
+
+9. Error Handling and Logging:
+   - Implement comprehensive error handling throughout the application
+   - Set up error logging to Firebase Analytics or a third-party service
+
+10. Documentation:
+    - Create user documentation for new features and workflows
+    - Update developer documentation with new architecture and components
+
+# Test Strategy:
+1. Unit Testing:
+   - Write unit tests for all new components and functions using Jest and React Testing Library
+   - Ensure at least 80% code coverage for new features
+
+2. Integration Testing:
+   - Use Playwright to create end-to-end tests for key user workflows:
+     a. Creating, editing, and deleting notes
+     b. Organizing notes in folders
+     c. Adding and removing tags
+     d. Associating notes with PDF files
+     e. Searching and filtering notes
+   - Test real-time updates across multiple browser instances
+
+3. Performance Testing:
+   - Use Lighthouse to measure and optimize page load times and performance scores
+   - Test application performance with a large number of notes (1000+) to ensure scalability
+
+4. Cross-browser Testing:
+   - Use BrowserStack or similar service to test on multiple browser and OS combinations
+   - Ensure consistent functionality and appearance across platforms
+
+5. Usability Testing:
+   - Conduct user testing sessions with a small group of target users
+   - Gather feedback on new features and overall user experience
+
+6. Security Testing:
+   - Perform penetration testing to identify potential vulnerabilities
+   - Verify Firebase Security Rules are correctly implemented and preventing unauthorized access
+
+7. Offline Functionality Testing:
+   - Test application behavior when offline and verify data synchronization when connection is restored
+
+8. Accessibility Testing:
+   - Use aXe or similar tools to check WCAG 2.1 compliance
+   - Perform manual testing with screen readers and keyboard navigation
+
+9. Error Handling Testing:
+   - Simulate various error conditions (network issues, Firebase errors) to ensure proper error handling and user feedback
+
+10. Regression Testing:
+    - Verify that existing GANTT chart functionality remains unaffected by new changes
+    - Run automated tests for all previously implemented features
+
+# Subtasks:
+## 1. Research and Analysis Phase (using Perplexity tool) [pending]
+### Dependencies: None
+### Description: Conduct comprehensive research on mobile-first CSS, responsive layouts, touch interactions, mobile upload UI, calendar optimization, sidebar, modals, lazy loading, and offline support. Analyze best practices and technical requirements for each feature, focusing on integration with Firebase and modern frontend frameworks.
+### Details:
+Utilize the Perplexity tool for gathering up-to-date resources and examples. Document findings and create a technical requirements specification to guide subsequent development phases.
+
+## 2. Notes Overview and Dashboard System [pending]
+### Dependencies: 17.1
+### Description: Design and implement a mobile-first, responsive dashboard for notes overview, ensuring optimal usability on all device sizes. Integrate touch-friendly navigation and quick access to core features.
+### Details:
+Apply CSS mobile-first principles, fluid grids, and media queries. Ensure dashboard components (lists, previews, search) are accessible and performant on mobile. Integrate Firebase for real-time data display.
+
+## 3. Complete Folder Management System [pending]
+### Dependencies: 17.2
+### Description: Develop a folder management system with responsive layouts and touch interactions. Support drag-and-drop, swipe gestures, and accordion-style navigation for mobile users.
+### Details:
+Implement touch-optimized UI elements for folder creation, renaming, and organization. Ensure seamless integration with Firebase for folder data persistence and updates.
+
+## 4. Enhanced Tag Management System [pending]
+### Dependencies: 17.3
+### Description: Create a tag management interface optimized for mobile, supporting responsive layouts and touch interactions. Enable users to add, edit, and filter tags efficiently.
+### Details:
+Design tag chips/buttons with adequate spacing for touch. Integrate real-time updates with Firebase and ensure accessibility across devices.
+
+## 5. File Association System Fix and Enhancement [pending]
+### Dependencies: 17.4
+### Description: Revamp the file association UI for mobile-first experience, including a streamlined upload interface, drag-and-drop support, and offline upload queuing.
+### Details:
+Implement a mobile upload UI with progress indicators, error handling, and touch-friendly controls. Ensure files can be associated with notes/folders and synced with Firebase Storage.
+
+## 6. Firebase Storage Optimization and Performance [pending]
+### Dependencies: 17.5
+### Description: Optimize Firebase Storage integration for performance, including lazy loading of files, offline support, and efficient data synchronization.
+### Details:
+Implement lazy loading for file previews and attachments. Add offline support using service workers or Firebase offline capabilities. Monitor and optimize storage usage and retrieval speeds.
+
+## 7. Comprehensive Testing with Playwright [pending]
+### Dependencies: None
+### Description: Develop and execute automated tests using Playwright to validate mobile responsiveness, touch interactions, upload flows, calendar, sidebar, modals, lazy loading, and offline support across devices.
+### Details:
+Write end-to-end tests covering all user journeys on mobile and desktop. Ensure all features work seamlessly with Firebase integration and meet accessibility standards.
+

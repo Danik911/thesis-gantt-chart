@@ -1,0 +1,21 @@
+# Task ID: 1
+# Title: Setup Enhanced Project Repository
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Set up the project repository with the existing codebase and prepare for new enhancements.
+# Details:
+1. Fork the existing repository (https://github.com/danik911/thesis-gantt-chart)
+2. Clone the forked repository locally
+3. Set up a new branch for enhancements (e.g., 'enhancement-phase-1')
+4. Update README.md with project goals and roadmap
+5. Set up GitHub Actions for continuous integration
+6. Configure GitHub Pages for the enhanced version
+7. Install and configure ESLint and Prettier for code quality
+8. Set up a local development environment with live-reload capability
+
+# Test Strategy:
+1. Verify successful repository setup
+2. Ensure GitHub Actions runs successfully on push
+3. Confirm GitHub Pages deployment works
+4. Test local development environment functionality
