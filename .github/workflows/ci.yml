@@ -52,6 +52,9 @@ jobs:
     # - name: Run tests
     #   run: npm test -- --coverage --watchAll=false --passWithNoTests --verbose=false --silent
     
+    - name: Debug: List environment variables
+      run: env | grep REACT_APP || echo "No REACT_APP vars found"
+    
     - name: Build project
       run: npm run build
       env:
