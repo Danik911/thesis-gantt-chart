@@ -243,15 +243,33 @@ const TextNotesWithLocalStorage = () => {
     }
   }, []);
   
-  // Subtask 15.2: Manual Save Only (Auto-save removed for performance)
-  // Auto-save functionality has been removed to prevent excessive Firebase writes
-  // Users can save manually using the "Save Now" button or Ctrl+S shortcut
-  
   // Subtask 15.6: Implement Notes Loading on App Startup
   useEffect(() => {
     handleLoadFromStorage();
     loadAvailableFiles();
   }, []); // Empty dependency array for component mount only
+
+  // Subtask 15.4: Add Manual Save Button
+  const handleManualSave = useCallback(async () => {
+    // Validate notes before saving
+    if (!notes.title.trim() && !notes.content.trim()) {
+      setToastMessage('Please add a title or content before saving');
+      setToastVariant('warning');
+      setShowToast(true);
+      return;
+    }
+    
+    try {
+      await handleSaveToStorage(notes);
+      
+      // Show success toast
+      setToastMessage('Notes saved manually');
+      setToastVariant('success');
+      setShowToast(true);
+    } catch (error) {
+      // Error handling is already done in handleSaveToStorage
+    }
+  }, [notes, handleSaveToStorage]);
 
   // Add keyboard shortcut for manual save (Ctrl+S)
   useEffect(() => {
@@ -274,28 +292,6 @@ const TextNotesWithLocalStorage = () => {
       checkAssociation();
     }
   }, [currentNoteId, availableFiles, checkAssociation]);
-  
-  // Subtask 15.4: Add Manual Save Button
-  const handleManualSave = useCallback(async () => {
-    // Validate notes before saving
-    if (!notes.title.trim() && !notes.content.trim()) {
-      setToastMessage('Please add a title or content before saving');
-      setToastVariant('warning');
-      setShowToast(true);
-      return;
-    }
-    
-    try {
-      await handleSaveToStorage(notes);
-      
-      // Show success toast
-      setToastMessage('Notes saved manually');
-      setToastVariant('success');
-      setShowToast(true);
-    } catch (error) {
-      // Error handling is already done in handleSaveToStorage
-    }
-  }, [notes, handleSaveToStorage]);
   
   // Content change handlers
   const handleTitleChange = useCallback((e) => {
