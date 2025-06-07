@@ -129,7 +129,7 @@ const TextNotesWithLocalStorage = () => {
             setCurrentNoteId(docRef.id);
           }
           
-          console.log('Note saved to Firebase successfully');
+          console.log('Note saved to Firebase successfully at', new Date().toLocaleTimeString());
         } catch (firebaseError) {
           console.error('Firebase save error (continuing with localStorage):', firebaseError);
           // Don't fail the save if Firebase fails, localStorage is primary
@@ -245,7 +245,7 @@ const TextNotesWithLocalStorage = () => {
   
   // Subtask 15.2: Implement Auto-Save with Debouncing
   const debouncedSave = useMemo(() => {
-    return createDebouncedSave(handleSaveToStorage, 1500); // 1.5 second delay
+    return createDebouncedSave(handleSaveToStorage, 3000); // Increased to 3 second delay
   }, [handleSaveToStorage]);
   
   // Store debounced function in ref for cleanup
@@ -258,12 +258,18 @@ const TextNotesWithLocalStorage = () => {
     };
   }, [debouncedSave]);
   
-  // Auto-save when notes change
+  // Auto-save when notes change - with better dependency management
+  const notesStringified = useMemo(() => 
+    JSON.stringify({ title: notes.title, content: notes.content, tags: notes.tags, folders: notes.folders }), 
+    [notes.title, notes.content, notes.tags, notes.folders]
+  );
+  
   useEffect(() => {
     if (!isLoading && (notes.title || notes.content)) {
+      console.log('Auto-save triggered for notes change at', new Date().toLocaleTimeString());
       debouncedSave(notes);
     }
-  }, [notes, debouncedSave, isLoading]);
+  }, [notesStringified, debouncedSave, isLoading, notes]);
   
   // Subtask 15.6: Implement Notes Loading on App Startup
   useEffect(() => {

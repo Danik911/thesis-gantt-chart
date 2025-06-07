@@ -7,10 +7,17 @@
 // Debounce function to limit save frequency
 export const debounce = (func, delay) => {
   let timeoutId;
-  return (...args) => {
+  const debouncedFunction = (...args) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func.apply(null, args), delay);
   };
+  
+  // Add cancel method to clear pending timeouts
+  debouncedFunction.cancel = () => {
+    clearTimeout(timeoutId);
+  };
+  
+  return debouncedFunction;
 };
 
 // Storage keys
