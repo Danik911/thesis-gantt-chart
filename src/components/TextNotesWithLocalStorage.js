@@ -15,6 +15,8 @@ import {
   isLocalStorageAvailable,
   getStorageUsage
 } from '../utils/notesStorage';
+// Debounce hook import
+import useDebounce from '../hooks/useDebounce';
 
 // Task 15: Implement Notes Persistence System with Auto-Save and Manual Save
 // Task 16: Implement File Association System for Notes and PDFs
@@ -57,8 +59,7 @@ const TextNotesWithLocalStorage = () => {
     error: associationError 
   } = useAssociations();
   
-  // Refs for cleanup
-  const debouncedSaveRef = useRef(null);
+  // Refs for editor
   const quillRef = useRef(null);
 
   // Load available files for association
@@ -243,32 +244,37 @@ const TextNotesWithLocalStorage = () => {
     }
   }, []);
   
-  // Store the save function in a ref to avoid recreating debounced function
-  const saveToStorageRef = useRef(handleSaveToStorage);
-  saveToStorageRef.current = handleSaveToStorage;
-  
   // Subtask 15.2: Implement Auto-Save with Debouncing
-  const debouncedSave = useMemo(() => {
-    return createDebouncedSave((...args) => saveToStorageRef.current(...args), 3000); // Increased to 3 second delay
-  }, []); // No dependencies to prevent recreation
+  // Create a serialized version of notes for debouncing to prevent object recreation issues
+  const notesForDebouncing = useMemo(() => {
+    return JSON.stringify({
+      title: notes.title,
+      content: notes.content, 
+      tags: notes.tags,
+      folders: notes.folders
+    });
+  }, [notes.title, notes.content, notes.tags, notes.folders]);
   
-  // Store debounced function in ref for cleanup
+  // Use the debounce hook with a 2-second delay
+  const debouncedNotesString = useDebounce(notesForDebouncing, 2000);
+  
+  // Auto-save effect - only triggers when debounced value changes
   useEffect(() => {
-    debouncedSaveRef.current = debouncedSave;
-    return () => {
-      if (debouncedSaveRef.current) {
-        debouncedSaveRef.current.cancel?.();
+    // Skip if still loading or if notes are empty
+    if (isLoading) return;
+    
+    try {
+      const debouncedNotes = JSON.parse(debouncedNotesString);
+      
+      // Only save if there's actual content
+      if (debouncedNotes.title.trim() || debouncedNotes.content.trim()) {
+        console.log('Auto-save triggered for notes change at', new Date().toLocaleTimeString());
+        handleSaveToStorage(notes);
       }
-    };
-  }, [debouncedSave]);
-  
-  // Auto-save when notes change - simplified approach
-  useEffect(() => {
-    if (!isLoading && (notes.title || notes.content)) {
-      console.log('Auto-save triggered for notes change at', new Date().toLocaleTimeString());
-      debouncedSave(notes);
+    } catch (error) {
+      console.error('Error parsing debounced notes:', error);
     }
-  }, [notes.title, notes.content, notes.tags, notes.folders, debouncedSave, isLoading]);
+  }, [debouncedNotesString, isLoading, notes, handleSaveToStorage]);
   
   // Subtask 15.6: Implement Notes Loading on App Startup
   useEffect(() => {
