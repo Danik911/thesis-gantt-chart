@@ -6,7 +6,7 @@
 class NotesService {
   constructor() {
     this.dbName = 'thesis-file-storage';
-    this.dbVersion = 2; // Increment version to add notes store
+    this.dbVersion = 3; // Increment version to add notes store
     this.storeName = 'notes';
     this.db = null;
   }
