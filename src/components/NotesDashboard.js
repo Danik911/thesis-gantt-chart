@@ -20,6 +20,7 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import NotesEditor from './NotesEditor';
+import LoginForm from './LoginForm';
 
 const NotesDashboard = () => {
   const { user } = useAuth();
@@ -337,8 +338,14 @@ const NotesDashboard = () => {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-600">Please sign in to access your notes.</p>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="w-full max-w-md mx-4">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">📝 Text Notes</h1>
+            <p className="text-gray-600">Sign in to access your notes and start organizing your thoughts.</p>
+          </div>
+          <LoginForm />
+        </div>
       </div>
     );
   }
