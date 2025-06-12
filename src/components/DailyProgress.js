@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNotes } from '../contexts/NotesContext';
 import { useAuth } from '../contexts/AuthContext';
 import Calendar from './Calendar';
-import FileStorageService from '../services/FileStorageService';
+import fileStorageService from '../services/FileStorageService';
 import { 
   FaStickyNote, 
   FaFile, 
@@ -35,8 +35,7 @@ const DailyProgress = () => {
   const [filesLoading, setFilesLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('tasks'); // 'tasks', 'notes', 'files', 'all'
   
-  // File storage service instance
-  const fileStorageService = new FileStorageService();
+  // File storage service instance (imported as singleton)
 
   // Helper function to check if two dates are on the same day
   const isSameDay = (date1, date2) => {
