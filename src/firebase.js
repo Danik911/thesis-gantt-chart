@@ -9,18 +9,16 @@ const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
   authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  // Ensure storage bucket uses the expected "<projectId>.appspot.com" pattern.
-  // Some older or incorrectly set environment variables may contain
-  // the experimental ".firebasestorage.app" domain that breaks uploads and
-  // triggers CORS errors. Fallback to the default bucket based on the project
-  // id when storageBucket is missing or malformed.
+  // Ensure storage bucket uses the correct format for new Firebase projects.
+  // Projects created after October 30, 2024 use the ".firebasestorage.app" format.
+  // Fallback to the default bucket based on the project id when storageBucket is missing.
   storageBucket:
     (() => {
       const raw = process.env.REACT_APP_FIREBASE_STORAGE_BUCKET;
       const pid = process.env.REACT_APP_FIREBASE_PROJECT_ID;
-      if (!raw || /\.firebasestorage\.app$/.test(raw)) {
-        // Use default bucket format
-        return `${pid}.appspot.com`;
+      if (!raw) {
+        // Use new default bucket format for projects created after Oct 30, 2024
+        return `${pid}.firebasestorage.app`;
       }
       return raw;
     })(),
