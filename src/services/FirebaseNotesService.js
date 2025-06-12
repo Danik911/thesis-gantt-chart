@@ -112,7 +112,13 @@ class FirebaseNotesService {
   async createNote(noteData, userId) {
     if (!userId) throw new Error('User ID is required');
     
-    const noteRef = doc(collection(db, this.collections.notes));
+    // Allow callers to specify an ID so that the same note ID can be
+    // shared across different persistence layers (e.g. IndexedDB + Firestore).
+    // This guarantees that all parts of the application reference a single
+    // source-of-truth identifier which simplifies cross-component syncing.
+    const noteRef = noteData.id
+      ? doc(db, this.collections.notes, noteData.id)
+      : doc(collection(db, this.collections.notes));
     const now = serverTimestamp();
     
     // Normalize folder path – ensure it starts with '/'

@@ -87,6 +87,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
       if (user?.uid) {
         try {
           const firestoreNoteData = {
+            id: addedNote.id,
             title: addedNote.title,
             content: addedNote.content,
             htmlContent: '', // optional for pdf-note
@@ -128,16 +129,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
 
       // === FIRESTORE SYNC ===
       if (user?.uid) {
-        try {
-          // First, attempt to find matching note by fileId and title (rudimentary)
-          const allNotes = await firebaseNotesService.getNotes(user.uid);
-          const matching = allNotes.find(n => n.fileId === fileId && n.title === updatedNote.title);
-          if (matching) {
-            await firebaseNotesService.updateNote(matching.id, updates, user.uid);
-          }
-        } catch (syncErr) {
-          console.warn('Firestore update sync failed:', syncErr.message);
-        }
+        await firebaseNotesService.updateNote(noteId, updates, user.uid);
       }
       // === END FIRESTORE SYNC ===
     } catch (error) {
@@ -169,15 +161,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
 
       // === FIRESTORE SYNC ===
       if (user?.uid) {
-        try {
-          const allNotes = await firebaseNotesService.getNotes(user.uid);
-          const matching = allNotes.find(n => n.id === noteId || n.fileId === fileId && n.title === notes.find(nt=>nt.id===noteId)?.title);
-          if (matching) {
-            await firebaseNotesService.deleteNote(matching.id, user.uid);
-          }
-        } catch (syncErr) {
-          console.warn('Firestore delete sync failed:', syncErr.message);
-        }
+        await firebaseNotesService.deleteNote(noteId, user.uid);
       }
       // === END FIRESTORE SYNC ===
     } catch (error) {
