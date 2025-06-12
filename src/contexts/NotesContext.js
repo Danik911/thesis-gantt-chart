@@ -216,7 +216,7 @@ export const NotesProvider = ({ children }) => {
       const newNote = await firebaseNotesService.createNote(noteData, user.uid);
       // Also persist in unified local store so PDF/other components see it.
       try {
-        await unifiedNotesService.createNote({ id: newNote.id, ...noteData });
+        await unifiedNotesService.createNote(newNote);
       } catch (err) {
         console.warn('UnifiedNotesService create warning:', err.message);
       }

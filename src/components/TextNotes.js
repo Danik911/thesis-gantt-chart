@@ -703,9 +703,10 @@ const TextNotes = () => {
                     <p className="text-xs text-gray-500">
                       {note.folder} • {new Date(note.updatedAt).toLocaleDateString()}
                     </p>
-                    {(note.fileName || associatedPdf) && (
-                      <p className="text-xs text-blue-600">
-                        📎 {note.fileName || (currentNote?.id === note.id && associatedPdf ? associatedPdf.name : 'Associated PDF')}
+                    {note.type === 'file-associated' && note.fileName && (
+                      <p className="text-xs text-blue-600 pt-1 flex items-center gap-1">
+                        <span role="img" aria-label="attachment">📎</span> 
+                        <span>{note.fileName}</span>
                       </p>
                     )}
                     <div className="flex flex-wrap gap-1 mt-1">
