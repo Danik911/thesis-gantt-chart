@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import firebaseNotesService from '../services/FirebaseNotesService';
+import unifiedNotesService from '../services/UnifiedNotesService';
 
 const NotesContext = createContext();
 
@@ -226,6 +227,18 @@ export const NotesProvider = ({ children }) => {
 
     try {
       const updatedNote = await firebaseNotesService.updateNote(noteId, updates, user.uid);
+      // Persist the same change to IndexedDB unified store so other
+      // components (e.g. PDF Manager) immediately see the update.
+      try {
+        await unifiedNotesService.updateNote(noteId, updates);
+      } catch (err) {
+        // If the note is missing locally create it so that IDs stay aligned.
+        if (err.message.includes('Note not found')) {
+          await unifiedNotesService.createNote({ id: noteId, ...updatedNote });
+        } else {
+          console.warn('UnifiedNotesService update failed:', err.message);
+        }
+      }
       // Note will be automatically updated via real-time subscription
       return updatedNote;
     } catch (error) {
@@ -239,6 +252,12 @@ export const NotesProvider = ({ children }) => {
 
     try {
       await firebaseNotesService.deleteNote(noteId, user.uid);
+      // Reflect deletion in the unified IndexedDB store as well.
+      try {
+        await unifiedNotesService.deleteNote(noteId);
+      } catch (err) {
+        console.warn('UnifiedNotesService delete warning:', err.message);
+      }
       // Note will be automatically removed via real-time subscription
     } catch (error) {
       dispatch({ type: NOTES_ACTIONS.SET_ERROR, payload: error.message });

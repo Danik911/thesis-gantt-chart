@@ -224,8 +224,12 @@ class FirebaseNotesService {
       const noteRef = doc(db, this.collections.notes, noteId);
       const noteSnap = await getDoc(noteRef);
       
+      // If the note does not exist in Firestore we treat the operation as
+      // already completed – this can happen if the local/IndexedDB copy was
+      // deleted before Firestore synchronised.
       if (!noteSnap.exists()) {
-        throw new Error('Note not found');
+        console.warn('deleteNote: Note not found in Firestore, ignoring');
+        return true;
       }
       
       const note = noteSnap.data();
