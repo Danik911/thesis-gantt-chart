@@ -135,7 +135,12 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
 
   const exportNotes = async () => {
     try {
-      const exportData = await unifiedNotesService.exportNotes({ fileId });
+      // Use the notes from the component's state, which are from Firebase
+      const exportData = {
+        notes: notes,
+        fileName: fileName,
+        exportDate: new Date().toISOString()
+      };
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
         type: 'application/json' 
       });
