@@ -22,6 +22,9 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: thesis-gantt-chart
     
     environment:
       name: github-pages
@@ -37,8 +40,17 @@ jobs:
         node-version: '20'
         cache: 'npm'
     
+    - name: Cache node modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          thesis-gantt-chart/node_modules
+        key: ${{ runner.os }}-modules-${{ hashFiles('thesis-gantt-chart/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-modules-
+    
     - name: Install dependencies
-      run: npm install
+      run: npm ci --prefer-offline --no-audit --progress=false
     
     - name: Run linter (continue on error)
       run: npm run lint || echo "Linting completed with warnings"
@@ -78,7 +90,7 @@ jobs:
       uses: actions/upload-pages-artifact@v3
       with:
         # Upload entire build directory
-        path: './build'
+        path: './thesis-gantt-chart/build'
     
     - name: Deploy to GitHub Pages
       id: deployment
@@ -88,6 +100,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: thesis-gantt-chart
     
     steps:
     - uses: actions/checkout@v4
@@ -98,8 +113,17 @@ jobs:
         node-version: '20'
         cache: 'npm'
     
+    - name: Cache node modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          thesis-gantt-chart/node_modules
+        key: ${{ runner.os }}-modules-${{ hashFiles('thesis-gantt-chart/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-modules-
+    
     - name: Install dependencies for testing
-      run: npm install
+      run: npm ci --prefer-offline --no-audit --progress=false
     
     - name: Run linter
       run: npm run lint
