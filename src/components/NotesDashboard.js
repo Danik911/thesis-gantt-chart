@@ -408,7 +408,7 @@ const NotesDashboard = () => {
       </p>
       
       <div className="flex flex-wrap gap-1 mb-2">
-        {note.tags?.map(tag => (
+        {Array.isArray(note.tags) && note.tags.map(tag => (
           <span
             key={tag}
             className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
@@ -507,7 +507,7 @@ const NotesDashboard = () => {
           <div className="p-4 border-t">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">Tags</h3>
             <div className="flex flex-wrap gap-1">
-              {tags.map(tag => (
+              {(tags || []).map(tag => (
                 <div key={tag.id} className="flex items-center bg-gray-100 rounded-full">
                   <button
                     onClick={() => handleTagClick(tag.name)}
