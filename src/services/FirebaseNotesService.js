@@ -303,6 +303,14 @@ class FirebaseNotesService {
     if (filters.folderPath) {
       filteredNotes = filteredNotes.filter(note => note.folderPath === filters.folderPath);
     }
+
+    if (filters.fileId) {
+      filteredNotes = filteredNotes.filter(note => note.fileId === filters.fileId);
+    }
+    
+    if (filters.type) {
+      filteredNotes = filteredNotes.filter(note => note.type === filters.type);
+    }
     
     return filteredNotes;
   }
