@@ -8,7 +8,7 @@ import {
   doc, 
   getDoc, 
   getDocs, 
-  addDoc, 
+  setDoc, 
   updateDoc, 
   deleteDoc, 
   query, 
@@ -115,13 +115,18 @@ class FirebaseNotesService {
     const noteRef = doc(collection(db, this.collections.notes));
     const now = serverTimestamp();
     
+    // Normalize folder path – ensure it starts with '/'
+    const folderPath = (noteData.folderPath || noteData.folder || '/General').startsWith('/')
+      ? (noteData.folderPath || noteData.folder || '/General')
+      : `/${noteData.folderPath || noteData.folder}`;
+
     const note = {
       id: noteRef.id,
       title: noteData.title || 'Untitled Note',
       content: noteData.content || '',
       htmlContent: noteData.htmlContent || '',
       markdownContent: noteData.markdownContent || '',
-      folderPath: noteData.folderPath || '/General',
+      folderPath,
       tags: noteData.tags || [],
       fileId: noteData.fileId || null,
       fileName: noteData.fileName || null,
@@ -135,8 +140,21 @@ class FirebaseNotesService {
       updatedAt: now,
       searchableText: `${noteData.title || ''} ${this.extractPlainText(noteData.content || '')}`.toLowerCase()
     };
-    
-    await updateDoc(noteRef, note);
+
+    try {
+      // Ensure the folder exists; ignore error if it already exists
+      await this.createFolder({ name: folderPath.replace(/^\//, ''), path: folderPath }, userId)
+        .catch(() => {});
+    } catch (_) {
+      // Folder already exists or creation failed – silently continue
+    }
+
+    await setDoc(noteRef, note);
+
+    // Update folder note count & create tags
+    await this.updateFolderNotesCount(folderPath, userId, 1);
+    await this.createTagsIfNotExist(note.tags, userId);
+
     return { ...note, id: noteRef.id };
   }
 
@@ -343,7 +361,7 @@ class FirebaseNotesService {
         description: folderData.description || ''
       };
       
-      await updateDoc(folderRef, folder);
+      await setDoc(folderRef, folder);
       
       return { ...folder, id: folderRef.id };
     } catch (error) {

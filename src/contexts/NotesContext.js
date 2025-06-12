@@ -130,14 +130,16 @@ export const NotesProvider = ({ children }) => {
   const [state, dispatch] = useReducer(notesReducer, initialState);
   const { user } = useAuth();
 
-  // Real-time subscription cleanup
+  // Real-time subscriptions cleanup
   useEffect(() => {
     let unsubscribeNotes = null;
+    let unsubscribeFolders = null;
+    let unsubscribeTags = null;
 
     if (user?.uid) {
       dispatch({ type: NOTES_ACTIONS.SET_LOADING, payload: true });
 
-      // Set up real-time notes subscription
+      // Notes
       unsubscribeNotes = firebaseNotesService.subscribeToNotes(
         user.uid,
         (notes, error) => {
@@ -149,12 +151,36 @@ export const NotesProvider = ({ children }) => {
         },
         state.filters
       );
+
+      // Folders
+      unsubscribeFolders = firebaseNotesService.subscribeToFolders(
+        user.uid,
+        (folders, error) => {
+          if (error) {
+            dispatch({ type: NOTES_ACTIONS.SET_ERROR, payload: error.message });
+          } else {
+            dispatch({ type: NOTES_ACTIONS.SET_FOLDERS, payload: folders });
+          }
+        }
+      );
+
+      // Tags
+      unsubscribeTags = firebaseNotesService.subscribeToTags(
+        user.uid,
+        (tags, error) => {
+          if (error) {
+            dispatch({ type: NOTES_ACTIONS.SET_ERROR, payload: error.message });
+          } else {
+            dispatch({ type: NOTES_ACTIONS.SET_TAGS, payload: tags });
+          }
+        }
+      );
     }
 
     return () => {
-      if (unsubscribeNotes) {
-        unsubscribeNotes();
-      }
+      unsubscribeNotes && unsubscribeNotes();
+      unsubscribeFolders && unsubscribeFolders();
+      unsubscribeTags && unsubscribeTags();
     };
   }, [user?.uid, state.filters]);
 

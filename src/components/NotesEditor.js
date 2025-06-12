@@ -11,8 +11,10 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useNotes } from '../contexts/NotesContext';
+import { useAuth } from '../contexts/AuthContext';
 import AssociationSelector from './AssociationSelector';
 import 'draft-js/dist/Draft.css';
+import firebaseNotesService from '../services/FirebaseNotesService';
 
 const { hasCommandModifier } = KeyBindingUtil;
 
@@ -26,10 +28,12 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
     tags: availableTags
   } = useNotes();
 
+  const { user } = useAuth();
+
   const [editorState, setEditorState] = useState(() => EditorState.createEmpty());
   const [title, setTitle] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
-  const [selectedFolder, setSelectedFolder] = useState('General');
+  const [selectedFolder, setSelectedFolder] = useState('/General');
   const [isMarkdownMode, setIsMarkdownMode] = useState(false);
   const [markdownContent, setMarkdownContent] = useState('');
   const [autoSaveStatus, setAutoSaveStatus] = useState('saved');
@@ -45,7 +49,7 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
     if (note) {
       setTitle(note.title || '');
       setSelectedTags(note.tags || []);
-      setSelectedFolder(note.folder || 'General');
+      setSelectedFolder(note.folderPath || '/General');
       setAssociatedFile(note.fileId || null);
       setIsMarkdownMode(!!note.markdownContent);
       setMarkdownContent(note.markdownContent || '');
@@ -94,7 +98,7 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
         htmlContent,
         markdownContent: isMarkdownMode ? markdownContent : '',
         tags: selectedTags,
-        folder: selectedFolder,
+        folderPath: selectedFolder,
         characterCount,
         wordCount,
         fileId: associatedFile,
@@ -194,6 +198,24 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
     setIsPreviewMode(false);
   };
 
+  // Handle creation of new folder from dropdown
+  const handleFolderChange = async (value) => {
+    if (value === '__create_new__') {
+      const folderName = prompt('Enter new folder name');
+      if (!folderName) return;
+      const path = folderName.startsWith('/') ? folderName : `/${folderName}`;
+      try {
+        await firebaseNotesService.createFolder({ name: folderName, path }, user?.uid);
+        toast.success('Folder created');
+        setSelectedFolder(path);
+      } catch (err) {
+        toast.error(err.message || 'Failed to create folder');
+      }
+    } else {
+      setSelectedFolder(value);
+    }
+  };
+
   return (
     <div className={`notes-editor ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'relative'}`}>
       {/* Header */}
@@ -291,12 +313,13 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
                 <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
                 <select
                   value={selectedFolder}
-                  onChange={(e) => setSelectedFolder(e.target.value)}
+                  onChange={(e) => handleFolderChange(e.target.value)}
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                 >
                   {folders.map(folder => (
-                    <option key={folder} value={folder}>{folder}</option>
+                    <option key={folder.path} value={folder.path}>{folder.name}</option>
                   ))}
+                  <option value="__create_new__">➕ Create new folder…</option>
                 </select>
               </div>
 
@@ -318,15 +341,19 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
                     </span>
                   ))}
                   <select
-                    onChange={(e) => e.target.value && setSelectedTags([...selectedTags, e.target.value])}
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      setSelectedTags([...selectedTags, e.target.value]);
+                    }}
                     value=""
                     className="text-xs border border-gray-300 rounded px-2 py-1"
                   >
                     <option value="">Add tag...</option>
                     {availableTags
-                      .filter(tag => !selectedTags.includes(tag))
-                      .map(tag => (
-                        <option key={tag} value={tag}>{tag}</option>
+                      .map(t => t.name)
+                      .filter(tagName => !selectedTags.includes(tagName))
+                      .map(tagName => (
+                        <option key={tagName} value={tagName}>{tagName}</option>
                       ))}
                   </select>
                 </div>
