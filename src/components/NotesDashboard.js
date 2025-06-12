@@ -98,7 +98,7 @@ const NotesDashboard = () => {
 
   // Filtered and sorted notes
   const filteredAndSortedNotes = useMemo(() => {
-    let filtered = [...notes];
+    let filtered = [...(notes || [])];
 
     // Apply search filter
     if (searchQuery) {
@@ -671,7 +671,7 @@ const NotesDashboard = () => {
               ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
               : 'space-y-4'
             }>
-              {filteredAndSortedNotes.map(renderNoteCard)}
+              {(filteredAndSortedNotes || []).map(renderNoteCard)}
             </div>
           )}
         </div>
