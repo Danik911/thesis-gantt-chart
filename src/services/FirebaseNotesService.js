@@ -169,7 +169,10 @@ class FirebaseNotesService {
       const noteSnap = await getDoc(noteRef);
       
       if (!noteSnap.exists()) {
-        throw new Error('Note not found');
+        // Auto-create if missing (idempotent sync)
+        console.warn('updateNote: Note not found, creating new one');
+        await this.createNote({ id: noteId, ...updates }, userId);
+        return { id: noteId, ...updates };
       }
       
       const currentNote = noteSnap.data();
@@ -337,7 +340,9 @@ class FirebaseNotesService {
       const existingFolders = await getDocs(existingFolderQuery);
       
       if (!existingFolders.empty) {
-        throw new Error('Folder with this path already exists');
+        // Folder already exists – return the existing folder instead of throwing
+        const docSnap = existingFolders.docs[0];
+        return { id: docSnap.id, ...docSnap.data() };
       }
       
       const folderRef = doc(collection(db, this.collections.folders));
