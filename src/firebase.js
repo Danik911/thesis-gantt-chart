@@ -1,6 +1,6 @@
 // Firebase configuration and initialization
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -36,6 +36,23 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Ensure we have at least an anonymous auth session so that Firestore and
+// Storage use an auth token instead of an API key (which is often restricted
+// in production). This also avoids permission issues with default Firebase
+// security rules that require authentication. The sign-in only runs once and
+// does not interfere if the user later performs email/password or Google
+// login.
+if (typeof window !== 'undefined') {
+  onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      // No user signed in – perform anonymous sign-in.
+      signInAnonymously(auth).catch((err) => {
+        console.error('Anonymous sign-in failed:', err);
+      });
+    }
+  });
+}
 
 // Export the app instance
 export default app; 
