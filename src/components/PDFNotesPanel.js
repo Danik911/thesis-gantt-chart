@@ -396,7 +396,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
                         />
                         
                         <textarea
-                          value={editingNote.content}
+                          value={renderNoteContent(editingNote.content)}
                           onChange={(e) => setEditingNote(prev => ({ ...prev, content: e.target.value }))}
                           rows="4"
                           className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
@@ -405,7 +405,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
 
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleUpdateNote(note.id, editingNote)}
+                            onClick={() => handleUpdateNote(note.id, { title: editingNote.title, content: editingNote.content })}
                             className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
                           >
                             Save

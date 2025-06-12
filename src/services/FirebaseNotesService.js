@@ -175,10 +175,7 @@ class FirebaseNotesService {
       const noteSnap = await getDoc(noteRef);
       
       if (!noteSnap.exists()) {
-        // Auto-create if missing (idempotent sync)
-        console.warn('updateNote: Note not found, creating new one');
-        await this.createNote({ id: noteId, ...updates }, userId);
-        return { id: noteId, ...updates };
+        throw new Error("Note not found, can't update.");
       }
       
       const currentNote = noteSnap.data();
