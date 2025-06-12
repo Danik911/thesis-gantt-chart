@@ -18,7 +18,6 @@ export default class ClientStorageUpload extends BasePlugin {
     this.defaultOptions = {
       limit: 3, // Number of concurrent uploads
       timeout: 30000, // 30 seconds timeout
-      simulateProgress: true // Whether to simulate upload progress
     };
 
     this.opts = { ...this.defaultOptions, ...opts };
@@ -115,10 +114,13 @@ export default class ClientStorageUpload extends BasePlugin {
       // Emit upload-started event
       this.uppy.emit('upload-started', file);
 
-      // Simulate upload progress if enabled
-      if (this.opts.simulateProgress) {
-        await this.simulateProgress(file);
-      }
+      // Define progress handler
+      const onProgress = (progress) => {
+          this.uppy.emit('upload-progress', file, {
+            bytesUploaded: progress.bytesUploaded,
+            bytesTotal: progress.bytesTotal,
+          });
+      };
 
       // Extract metadata from file, including folder information
       const metadata = file.meta || {};
@@ -128,7 +130,7 @@ export default class ClientStorageUpload extends BasePlugin {
       metadata.folderPath = folderPath;
 
       // Store file using our storage service
-      const result = await fileStorageService.storeFile(file.data, metadata);
+      const result = await fileStorageService.storeFile(file.data, metadata, onProgress);
 
       // Emit upload-success event
       this.uppy.emit('upload-success', file, result);
@@ -145,45 +147,6 @@ export default class ClientStorageUpload extends BasePlugin {
       
       throw error;
     }
-  }
-
-  /**
-   * Simulate upload progress for better user experience
-   * @param {Object} file - Uppy file object
-   * @returns {Promise} - Progress simulation promise
-   */
-  async simulateProgress(file) {
-    return new Promise((resolve) => {
-      const startTime = Date.now();
-      const duration = Math.min(file.data.size / 100000, 3000); // Scale with file size, max 3s
-      const steps = 50;
-      let currentStep = 0;
-
-      const updateProgress = () => {
-        if (currentStep >= steps) {
-          // Complete progress
-          this.uppy.emit('upload-progress', file, {
-            bytesUploaded: file.data.size,
-            bytesTotal: file.data.size
-          });
-          resolve();
-          return;
-        }
-
-        const progress = currentStep / steps;
-        const bytesUploaded = Math.round(file.data.size * progress);
-
-        this.uppy.emit('upload-progress', file, {
-          bytesUploaded: bytesUploaded,
-          bytesTotal: file.data.size
-        });
-
-        currentStep++;
-        setTimeout(updateProgress, duration / steps);
-      };
-
-      updateProgress();
-    });
   }
 
   /**

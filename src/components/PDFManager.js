@@ -53,43 +53,30 @@ const PDFManager = ({
     try {
       setLoadingFiles(true);
       
-      // Add timeout protection for IndexedDB initialization
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('IndexedDB initialization timeout')), 10000)
-      );
-      
-      const initPromise = fileStorageService.initDB();
-      await Promise.race([initPromise, timeoutPromise]);
-      console.log('PDFManager: IndexedDB initialized successfully');
-
       const storedFiles = await fileStorageService.listFiles();
       console.log('PDFManager: Found stored files:', storedFiles.length);
       
-      // Filter only PDF files and get full file data
+      // Filter only PDF files
       const pdfMetadata = storedFiles.filter(storedFile => storedFile.type === 'application/pdf');
       console.log('PDFManager: PDF files found:', pdfMetadata.length);
       const pdfFiles = [];
       
       for (const metadata of pdfMetadata) {
         try {
-          // Get full file data including content
-          const fullFileData = await fileStorageService.getFile(metadata.id);
-          
-          // Create File object from stored data
-          const blob = new Blob([fullFileData.data], { type: fullFileData.type });
-          const file = new File([blob], fullFileData.name, {
-            type: fullFileData.type,
-            lastModified: new Date(fullFileData.uploadDate).getTime()
-          });
-          
-          // Add metadata from storage
-          file.storedId = fullFileData.id;
-          file.uploadedAt = fullFileData.uploadDate;
-          file.metadata = fullFileData.metadata;
+          // Create a mock File object. The actual data will be fetched on demand via URL
+          const file = {
+            name: metadata.name,
+            size: metadata.size,
+            type: metadata.type,
+            storedId: metadata.id,
+            uploadedAt: metadata.uploadDate,
+            metadata: metadata.metadata,
+            downloadURL: metadata.downloadURL // Important for viewer
+          };
           
           pdfFiles.push(file);
         } catch (error) {
-          console.error('Error loading file:', metadata.name, error);
+          console.error('Error processing file metadata:', metadata.name, error);
         }
       }
       
@@ -224,17 +211,22 @@ const PDFManager = ({
     return new Date(dateString).toLocaleDateString();
   };
 
-  const downloadFile = (file) => {
+  const downloadFile = async (file) => {
     try {
-      const blob = new Blob([file], { type: file.type });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      if(!file.storedId){
+        // Fallback for non-stored files
+        const blob = new Blob([file], { type: file.type });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        await fileStorageService.downloadFile(file.storedId);
+      }
     } catch (error) {
       console.error('Error downloading file:', error);
     }
@@ -257,9 +249,11 @@ const PDFManager = ({
           const { data: notes, error } = await firestoreService.readAll('notes', { where: { field: 'fileId', operator: '==', value: file.storedId } });
           if (error) throw new Error(error);
 
-          const batch = firestoreService.batch();
-          notes.forEach(note => batch.delete('notes', note.id));
-          await batch.commit();
+          if(notes && notes.length > 0){
+            const batch = firestoreService.batch();
+            notes.forEach(note => batch.delete('notes', note.id));
+            await batch.commit();
+          }
           
           console.log('PDFManager: Associated notes deleted from Firestore');
         } catch (notesError) {

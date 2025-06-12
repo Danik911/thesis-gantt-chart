@@ -72,7 +72,19 @@ const FileUploadWithFolders = () => {
     if (process.env.NODE_ENV === 'development') {
       console.log('Upload completed:', file.name, response);
     }
-    loadAllData();
+    if (response && response.body && response.body.success) {
+      const newFile = response.body.file;
+      
+      if(currentFolder === '/' || currentFolder === newFile.folderPath) {
+        setUploadedFiles(prev => [...prev, newFile]);
+      }
+      
+      loadStats();
+      loadActivity();
+      loadFolders();
+    } else {
+      loadAllData();
+    }
   };
 
   const handleUploadError = (file, error) => {

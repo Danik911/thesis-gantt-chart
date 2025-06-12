@@ -327,9 +327,9 @@ const FileUploadPage = () => {
             <div>
               <p className="text-sm text-yellow-800">
                 <strong>Note:</strong> This file upload system uses client-side storage (IndexedDB) 
-                to store your files locally in your browser. Files are persistent and will remain 
-                available until you clear your browser data. This solution works perfectly for 
-                static hosting platforms like GitHub Pages without requiring a backend server.
+                uploads your files to Firebase Cloud Storage and stores metadata in Firestore. Your files 
+                are securely stored in the cloud and available across devices. Because Firebase handles 
+                storage, files remain accessible even after clearing browser data.
               </p>
             </div>
           </div>
