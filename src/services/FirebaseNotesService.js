@@ -605,18 +605,29 @@ class FirebaseNotesService {
   subscribeToNotes(userId, callback, filters = {}) {
     if (!userId) throw new Error('User ID is required');
     
-    const notesQuery = query(
+    let q = query(
       collection(db, this.collections.notes),
-      where('ownerId', '==', userId),
-      orderBy('updatedAt', 'desc')
+      where('ownerId', '==', userId)
     );
 
-    // Fallback helper: perform one-time fetch if realtime listener fails (e.g., missing index still building)
+    // Apply server-side filters where possible
+    if (filters.fileId) {
+      q = query(q, where('fileId', '==', filters.fileId));
+    }
+    if (filters.type) {
+      q = query(q, where('type', '==', filters.type));
+    }
+
+    // Always order by last updated
+    q = query(q, orderBy('updatedAt', 'desc'));
+
+    // Fallback helper: perform one-time fetch if realtime listener fails
     const fetchOnce = async () => {
       try {
-        const snapshot = await getDocs(notesQuery);
+        const snapshot = await getDocs(q);
         const notes = [];
         snapshot.forEach((doc) => notes.push({ id: doc.id, ...doc.data() }));
+        // Still apply client-side filters for more complex scenarios
         callback(this.applyFilters(notes, filters));
       } catch (err) {
         console.error('Error fetching notes fallback:', err);
@@ -624,14 +635,16 @@ class FirebaseNotesService {
       }
     };
 
-    return onSnapshot(notesQuery, (snapshot) => {
+    return onSnapshot(q, (snapshot) => {
       const notes = [];
       snapshot.forEach((doc) => {
         notes.push({ id: doc.id, ...doc.data() });
       });
+       // Client-side filters for search, tags, etc., that are not part of the main query
       callback(this.applyFilters(notes, filters));
     }, (error) => {
       console.error('Error in notes subscription:', error);
+      // Attempt to fetch once if the listener fails (e.g., missing index)
       fetchOnce();
     });
   }
