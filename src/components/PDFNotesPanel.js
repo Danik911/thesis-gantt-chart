@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import unifiedNotesService from '../services/UnifiedNotesService';
 import { useAssociations } from '../contexts/AssociationContext';
+import { useAuth } from '../contexts/AuthContext';
+import firebaseNotesService from '../services/FirebaseNotesService';
 
 const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = '' }) => {
   const [notes, setNotes] = useState([]);
@@ -17,6 +19,9 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
 
   // Association context
   const { createAssociation, removeAssociationByNoteId } = useAssociations();
+
+  // Auth context for Firestore sync
+  const { user } = useAuth();
 
   const noteTypes = [
     { value: 'abstract', label: 'Abstract', icon: '📄', color: 'bg-blue-100 text-blue-800' },
@@ -77,6 +82,31 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
       if (onNotesChanged) {
         onNotesChanged();
       }
+
+      // === FIRESTORE SYNC ===
+      if (user?.uid) {
+        try {
+          const firestoreNoteData = {
+            title: addedNote.title,
+            content: addedNote.content,
+            htmlContent: '', // optional for pdf-note
+            markdownContent: '',
+            tags: addedNote.tags,
+            folderPath: '/General',
+            characterCount: 0,
+            wordCount: 0,
+            type: 'file-associated',
+            noteType: 'pdf-note',
+            fileId: fileId,
+            fileName: fileName,
+            fileType: 'pdf'
+          };
+          await firebaseNotesService.createNote(firestoreNoteData, user.uid);
+        } catch (syncErr) {
+          console.warn('Firestore sync failed:', syncErr.message);
+        }
+      }
+      // === END FIRESTORE SYNC ===
     } catch (error) {
       console.error('Error adding note:', error);
       alert('Failed to add note. Please try again.');
@@ -95,6 +125,21 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
       if (onNotesChanged) {
         onNotesChanged();
       }
+
+      // === FIRESTORE SYNC ===
+      if (user?.uid) {
+        try {
+          // First, attempt to find matching note by fileId and title (rudimentary)
+          const allNotes = await firebaseNotesService.getNotes(user.uid);
+          const matching = allNotes.find(n => n.fileId === fileId && n.title === updatedNote.title);
+          if (matching) {
+            await firebaseNotesService.updateNote(matching.id, updates, user.uid);
+          }
+        } catch (syncErr) {
+          console.warn('Firestore update sync failed:', syncErr.message);
+        }
+      }
+      // === END FIRESTORE SYNC ===
     } catch (error) {
       console.error('Error updating note:', error);
       alert('Failed to update note. Please try again.');
@@ -121,6 +166,20 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
       if (onNotesChanged) {
         onNotesChanged();
       }
+
+      // === FIRESTORE SYNC ===
+      if (user?.uid) {
+        try {
+          const allNotes = await firebaseNotesService.getNotes(user.uid);
+          const matching = allNotes.find(n => n.id === noteId || n.fileId === fileId && n.title === notes.find(nt=>nt.id===noteId)?.title);
+          if (matching) {
+            await firebaseNotesService.deleteNote(matching.id, user.uid);
+          }
+        } catch (syncErr) {
+          console.warn('Firestore delete sync failed:', syncErr.message);
+        }
+      }
+      // === END FIRESTORE SYNC ===
     } catch (error) {
       console.error('Error deleting note:', error);
       alert('Failed to delete note. Please try again.');
