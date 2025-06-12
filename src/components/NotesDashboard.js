@@ -114,7 +114,7 @@ const NotesDashboard = () => {
     }
 
     // Apply tag filter
-    if (selectedTags.length > 0) {
+    if (selectedTags && selectedTags.length > 0) {
       filtered = filtered.filter(note => 
         selectedTags.every(tag => note.tags?.includes(tag))
       );
@@ -235,9 +235,10 @@ const NotesDashboard = () => {
   };
 
   const handleTagClick = (tag) => {
-    const newSelectedTags = selectedTags.includes(tag)
-      ? selectedTags.filter(t => t !== tag)
-      : [...selectedTags, tag];
+    const currentTags = selectedTags || [];
+    const newSelectedTags = currentTags.includes(tag)
+      ? currentTags.filter(t => t !== tag)
+      : [...currentTags, tag];
     setSelectedTags(newSelectedTags);
   };
 
@@ -511,7 +512,7 @@ const NotesDashboard = () => {
                   <button
                     onClick={() => handleTagClick(tag.name)}
                     className={`text-xs px-2 py-1 rounded-l-full ${
-                      selectedTags.includes(tag.name)
+                      selectedTags && selectedTags.includes(tag.name)
                         ? 'bg-blue-200 text-blue-800'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
@@ -601,7 +602,7 @@ const NotesDashboard = () => {
           </div>
 
           {/* Active Filters */}
-          {(selectedFolder || selectedTags.length > 0 || searchQuery) && (
+          {(selectedFolder || (selectedTags && selectedTags.length > 0) || searchQuery) && (
             <div className="mt-4 flex flex-wrap gap-2">
               {selectedFolder && (
                 <span className="inline-flex items-center bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
@@ -615,7 +616,7 @@ const NotesDashboard = () => {
                   </button>
                 </span>
               )}
-              {selectedTags.map(tag => (
+              {selectedTags && selectedTags.map(tag => (
                 <span key={tag} className="inline-flex items-center bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full">
                   <FaTag className="mr-1" />
                   {tag}
@@ -654,7 +655,7 @@ const NotesDashboard = () => {
               <FaFolder size={48} className="mb-4" />
               <h3 className="text-lg font-semibold mb-2">No notes found</h3>
               <p className="text-center">
-                {searchQuery || selectedFolder || selectedTags.length > 0
+                {searchQuery || selectedFolder || (selectedTags && selectedTags.length > 0)
                   ? 'Try adjusting your filters or search terms.'
                   : 'Create your first note to get started.'}
               </p>
