@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Editor, EditorState, RichUtils, convertToRaw, convertFromRaw, getDefaultKeyBinding, KeyBindingUtil } from 'draft-js';
+import { Editor, EditorState, RichUtils, convertToRaw, convertFromRaw, ContentState, getDefaultKeyBinding, KeyBindingUtil } from 'draft-js';
 import { stateToHTML } from 'draft-js-export-html';
 import { stateFromHTML } from 'draft-js-import-html';
 import ReactMarkdown from 'react-markdown';
@@ -56,7 +56,14 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
 
       if (note.content) {
         try {
-          const contentState = convertFromRaw(note.content);
+          let contentState;
+          if (typeof note.content === 'object') {
+            // DraftJS raw object
+            contentState = convertFromRaw(note.content);
+          } else {
+            // Treat as plain text (e.g., pdf-note)
+            contentState = ContentState.createFromText(String(note.content));
+          }
           setEditorState(EditorState.createWithContent(contentState));
         } catch (error) {
           console.error('Error loading note content:', error);
