@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import unifiedNotesService from '../services/UnifiedNotesService';
-import { useAssociations } from '../contexts/AssociationContext';
 import { useAuth } from '../contexts/AuthContext';
 import firebaseNotesService from '../services/FirebaseNotesService';
 
@@ -17,9 +15,6 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     tags: []
   });
 
-  // Association context
-  const { createAssociation, removeAssociationByNoteId } = useAssociations();
-
   // Auth context for Firestore sync
   const { user } = useAuth();
 
@@ -31,22 +26,25 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
   ];
 
   useEffect(() => {
-    if (fileId) {
-      loadNotes();
+    if (!fileId || !user?.uid) {
+      setNotes([]);
+      return;
     }
-  }, [fileId]);
 
-  const loadNotes = async () => {
-    try {
-      setLoading(true);
-      const fileNotes = await unifiedNotesService.getNotesForFile(fileId);
-      setNotes(fileNotes);
-    } catch (error) {
-      console.error('Error loading notes:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setLoading(true);
+
+    const unsubscribe = firebaseNotesService.subscribeToNotes(
+      user.uid,
+      (fileNotes) => {
+        setNotes(fileNotes);
+        setLoading(false);
+      },
+      { fileId: fileId, type: 'file-associated' }
+    );
+
+    // Cleanup subscription on component unmount or when fileId changes
+    return () => unsubscribe();
+  }, [fileId, user?.uid]);
 
   const handleAddNote = async () => {
     if (!newNote.title.trim() && !newNote.content.trim()) {
@@ -64,50 +62,16 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
         tags: newNote.tags.filter(tag => tag.trim() !== '')
       };
 
-      const addedNote = await unifiedNotesService.createNote(noteData);
-      // Create association for cross-component syncing
-      try {
-        await createAssociation(addedNote.id, fileId, {
-          pdfName: fileName,
-          noteTitle: addedNote.title
-        });
-      } catch (assocErr) {
-        console.warn('Association creation failed or already exists:', assocErr.message);
-      }
-      setNotes(prev => [addedNote, ...prev]);
+      const addedNote = await firebaseNotesService.createNote(noteData, user.uid);
+      
+      // The real-time listener will automatically update the notes state.
       setNewNote({ noteType: 'pdf-note', type: 'general', title: '', content: '', tags: [] });
       setShowAddForm(false);
       
-      // Notify parent component
       if (onNotesChanged) {
         onNotesChanged();
       }
 
-      // === FIRESTORE SYNC ===
-      if (user?.uid) {
-        try {
-          const firestoreNoteData = {
-            id: addedNote.id,
-            title: addedNote.title,
-            content: addedNote.content,
-            htmlContent: '', // optional for pdf-note
-            markdownContent: '',
-            tags: addedNote.tags,
-            folderPath: '/General',
-            characterCount: 0,
-            wordCount: 0,
-            type: 'file-associated',
-            noteType: 'pdf-note',
-            fileId: fileId,
-            fileName: fileName,
-            fileType: 'pdf'
-          };
-          await firebaseNotesService.createNote(firestoreNoteData, user.uid);
-        } catch (syncErr) {
-          console.warn('Firestore sync failed:', syncErr.message);
-        }
-      }
-      // === END FIRESTORE SYNC ===
     } catch (error) {
       console.error('Error adding note:', error);
       alert('Failed to add note. Please try again.');
@@ -116,22 +80,13 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
 
   const handleUpdateNote = async (noteId, updates) => {
     try {
-      const updatedNote = await unifiedNotesService.updateNote(noteId, updates);
-      setNotes(prev => prev.map(note => 
-        note.id === noteId ? updatedNote : note
-      ));
+      await firebaseNotesService.updateNote(noteId, updates, user.uid);
+      // Real-time listener handles the update.
       setEditingNote(null);
       
-      // Notify parent component
       if (onNotesChanged) {
         onNotesChanged();
       }
-
-      // === FIRESTORE SYNC ===
-      if (user?.uid) {
-        await firebaseNotesService.updateNote(noteId, updates, user.uid);
-      }
-      // === END FIRESTORE SYNC ===
     } catch (error) {
       console.error('Error updating note:', error);
       alert('Failed to update note. Please try again.');
@@ -144,26 +99,11 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     }
 
     try {
-      // Remove association first (if any)
-      try {
-        await removeAssociationByNoteId(noteId);
-      } catch (assocErr) {
-        console.warn('Failed to remove association (maybe none):', assocErr.message);
-      }
-
-      await unifiedNotesService.deleteNote(noteId);
-      setNotes(prev => prev.filter(note => note.id !== noteId));
-      
-      // Notify parent component
+      await firebaseNotesService.deleteNote(noteId, user.uid);
+      // Real-time listener handles the deletion.
       if (onNotesChanged) {
         onNotesChanged();
       }
-
-      // === FIRESTORE SYNC ===
-      if (user?.uid) {
-        await firebaseNotesService.deleteNote(noteId, user.uid);
-      }
-      // === END FIRESTORE SYNC ===
     } catch (error) {
       console.error('Error deleting note:', error);
       alert('Failed to delete note. Please try again.');
@@ -171,7 +111,8 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = dateString?.toDate ? dateString.toDate() : new Date(dateString);
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -219,8 +160,12 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     }
 
     try {
-      await unifiedNotesService.unassociateNoteFromFile(noteId);
-      setNotes(prev => prev.filter(note => note.id !== noteId));
+      await firebaseNotesService.updateNote(noteId, {
+        type: 'standalone',
+        fileId: null,
+        fileName: null,
+        fileType: null,
+      }, user.uid);
       
       if (onNotesChanged) {
         onNotesChanged();
