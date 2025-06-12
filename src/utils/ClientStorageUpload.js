@@ -120,8 +120,12 @@ export default class ClientStorageUpload extends BasePlugin {
         await this.simulateProgress(file);
       }
 
-      // Extract metadata from file
+      // Extract metadata from file, including folder information
       const metadata = file.meta || {};
+      
+      // Get folder path from upload options or file metadata
+      const folderPath = this.opts.folderPath || metadata.folderPath || '/General';
+      metadata.folderPath = folderPath;
 
       // Store file using our storage service
       const result = await fileStorageService.storeFile(file.data, metadata);

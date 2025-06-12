@@ -17,6 +17,7 @@ const DailyProgress = lazy(() => import('./components/DailyProgress'));
 const TextNotesWithLocalStorage = lazy(() => import('./components/TextNotesWithLocalStorage'));
 const NotesDashboard = lazy(() => import('./components/NotesDashboard'));
 const FileUploadPage = lazy(() => import('./components/FileUploadPage'));
+const FileUploadWithFolders = lazy(() => import('./components/FileUploadWithFolders'));
 const GitHubFileManager = lazy(() => import('./components/GitHubFileManager'));
 const PDFManager = lazy(() => import('./components/PDFManager'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
@@ -86,6 +87,16 @@ function App() {
               />
               <Route 
                 path="/file-upload" 
+                element={
+                  <ErrorBoundary>
+                    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+                      <FileUploadWithFolders />
+                    </div>
+                  </ErrorBoundary>
+                } 
+              />
+              <Route 
+                path="/file-upload-legacy" 
                 element={
                   <ErrorBoundary>
                     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">

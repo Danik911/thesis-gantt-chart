@@ -37,11 +37,11 @@ const FileUploadPage = () => {
     }
   };
 
-  const handleUploadComplete = (file, response) => {
+  const handleUploadComplete = (file, response, metadata = {}) => {
     // Upload completed successfully
     if (process.env.NODE_ENV === 'development') {
       // eslint-disable-next-line no-console
-      console.log('Upload completed:', file.name, response);
+      console.log('Upload completed:', file.name, response, metadata);
     }
     // Refresh stats, activity, and file list from storage service
     loadStats();

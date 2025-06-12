@@ -12,7 +12,7 @@ import '@uppy/file-input/dist/style.css';
 import '@uppy/progress-bar/dist/style.css';
 import '@uppy/status-bar/dist/style.css';
 
-const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
+const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10, uploadMetadata = {} }) => {
   const [uppy, setUppy] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [uploadErrors, setUploadErrors] = useState([]);
@@ -88,7 +88,8 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
     uppyInstance.use(ClientStorageUpload, {
       limit: 3, // Number of concurrent uploads
       timeout: 30000, // 30 seconds timeout
-      simulateProgress: true // Show realistic upload progress
+      simulateProgress: true, // Show realistic upload progress
+      folderPath: uploadMetadata.folderPath || '/General' // Default folder
     });
 
     // Event listeners
@@ -126,7 +127,7 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
       setUploadedFiles(prev => [...prev, { file, response }]);
       
       if (onUploadComplete) {
-        onUploadComplete(file, response);
+        onUploadComplete(file, response, uploadMetadata);
       }
     });
 
@@ -339,7 +340,8 @@ const FileUpload = ({ onUploadComplete, onUploadError, maxFiles = 10 }) => {
 FileUpload.propTypes = {
   onUploadComplete: PropTypes.func,
   onUploadError: PropTypes.func,
-  maxFiles: PropTypes.number
+  maxFiles: PropTypes.number,
+  uploadMetadata: PropTypes.object
 };
 
 export default FileUpload; 

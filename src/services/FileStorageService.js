@@ -7,8 +7,9 @@
 class FileStorageService {
   constructor() {
     this.dbName = 'thesis-file-storage';
-    this.dbVersion = 3;
+    this.dbVersion = 4; // Incremented version for folder support
     this.storeName = 'files';
+    this.foldersStoreName = 'folders';
     this.db = null;
   }
 
@@ -36,6 +37,21 @@ class FileStorageService {
           store.createIndex('name', 'name', { unique: false });
           store.createIndex('type', 'type', { unique: false });
           store.createIndex('uploadDate', 'uploadDate', { unique: false });
+          store.createIndex('folderPath', 'folderPath', { unique: false });
+        } else if (event.oldVersion < 4) {
+          // Add folderPath index if upgrading from older version
+          const transaction = event.target.transaction;
+          const store = transaction.objectStore(this.storeName);
+          if (!store.indexNames.contains('folderPath')) {
+            store.createIndex('folderPath', 'folderPath', { unique: false });
+          }
+        }
+
+        // Create object store for folders
+        if (!db.objectStoreNames.contains(this.foldersStoreName)) {
+          const foldersStore = db.createObjectStore(this.foldersStoreName, { keyPath: 'path' });
+          foldersStore.createIndex('name', 'name', { unique: false });
+          foldersStore.createIndex('parentPath', 'parentPath', { unique: false });
         }
       };
     });
@@ -49,9 +65,57 @@ class FileStorageService {
   }
 
   /**
-   * Store a file in IndexedDB with metadata
+   * Create or ensure folder exists
+   * @param {string} folderPath - The folder path (e.g., '/Documents/PDFs')
+   * @param {string} folderName - The display name of the folder
+   */
+  async createFolder(folderPath, folderName) {
+    await this.initDB();
+
+    // Normalize folder path
+    const normalizedPath = folderPath.startsWith('/') ? folderPath : `/${folderPath}`;
+    const parentPath = normalizedPath.split('/').slice(0, -1).join('/') || null;
+
+    const folderData = {
+      path: normalizedPath,
+      name: folderName || normalizedPath.split('/').pop(),
+      parentPath: parentPath,
+      createdAt: new Date().toISOString(),
+      fileCount: 0
+    };
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.foldersStoreName], 'readwrite');
+      const store = transaction.objectStore(this.foldersStoreName);
+      
+      // Use put instead of add to allow updates
+      const request = store.put(folderData);
+
+      request.onsuccess = () => resolve(folderData);
+      request.onerror = () => reject(new Error('Failed to create folder'));
+    });
+  }
+
+  /**
+   * Get all folders
+   */
+  async getFolders() {
+    await this.initDB();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.foldersStoreName], 'readonly');
+      const store = transaction.objectStore(this.foldersStoreName);
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  /**
+   * Store a file in IndexedDB with metadata and folder organization
    * @param {File} file - The file to store
-   * @param {Object} metadata - Additional metadata
+   * @param {Object} metadata - Additional metadata including folderPath
    * @returns {Promise<Object>} - Upload result
    */
   async storeFile(file, metadata = {}) {
@@ -60,6 +124,9 @@ class FileStorageService {
 
       const fileId = this.generateFileId();
       const uploadDate = new Date().toISOString();
+      
+      // Default folder path if not specified
+      const folderPath = metadata.folderPath || '/General';
 
       // Convert file to ArrayBuffer for storage
       const arrayBuffer = await file.arrayBuffer();
@@ -71,15 +138,32 @@ class FileStorageService {
         size: file.size,
         data: arrayBuffer,
         uploadDate: uploadDate,
+        folderPath: folderPath,
         metadata: metadata
       };
 
-      return new Promise((resolve, reject) => {
-        const transaction = this.db.transaction([this.storeName], 'readwrite');
-        const store = transaction.objectStore(this.storeName);
-        const request = store.add(fileData);
+      // Ensure folder exists
+      const folderName = folderPath.split('/').pop() || 'General';
+      await this.createFolder(folderPath, folderName);
 
-        request.onsuccess = () => {
+      return new Promise((resolve, reject) => {
+        const transaction = this.db.transaction([this.storeName, this.foldersStoreName], 'readwrite');
+        const filesStore = transaction.objectStore(this.storeName);
+        const foldersStore = transaction.objectStore(this.foldersStoreName);
+        
+        const fileRequest = filesStore.add(fileData);
+
+        fileRequest.onsuccess = () => {
+          // Update folder file count
+          const folderRequest = foldersStore.get(folderPath);
+          folderRequest.onsuccess = () => {
+            const folder = folderRequest.result;
+            if (folder) {
+              folder.fileCount = (folder.fileCount || 0) + 1;
+              foldersStore.put(folder);
+            }
+          };
+
           // Update localStorage statistics
           this.updateUploadStats('success');
           
@@ -89,7 +173,8 @@ class FileStorageService {
             name: file.name,
             status: 'success',
             date: uploadDate,
-            size: file.size
+            size: file.size,
+            folderPath: folderPath
           });
 
           resolve({
@@ -103,20 +188,22 @@ class FileStorageService {
                 name: file.name,
                 type: file.type,
                 size: file.size,
-                uploadDate: uploadDate
+                uploadDate: uploadDate,
+                folderPath: folderPath
               }
             }
           });
         };
 
-        request.onerror = () => {
+        fileRequest.onerror = () => {
           this.updateUploadStats('error');
           this.addToRecentActivity({
             id: fileId,
             name: file.name,
             status: 'error',
             date: uploadDate,
-            error: 'Storage error'
+            error: 'Storage error',
+            folderPath: folderPath
           });
           reject(new Error('Failed to store file'));
         };
@@ -153,16 +240,25 @@ class FileStorageService {
   }
 
   /**
-   * List all stored files
+   * List all stored files, optionally filtered by folder
+   * @param {string} folderPath - Optional folder path to filter by
    * @returns {Promise<Array>} - Array of file metadata
    */
-  async listFiles() {
+  async listFiles(folderPath = null) {
     await this.initDB();
 
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction([this.storeName], 'readonly');
       const store = transaction.objectStore(this.storeName);
-      const request = store.getAll();
+      
+      let request;
+      if (folderPath) {
+        // Use index to filter by folder path
+        const index = store.index('folderPath');
+        request = index.getAll(folderPath);
+      } else {
+        request = store.getAll();
+      }
 
       request.onsuccess = () => {
         // Return only metadata, not the actual file data
@@ -172,12 +268,118 @@ class FileStorageService {
           type: file.type,
           size: file.size,
           uploadDate: file.uploadDate,
+          folderPath: file.folderPath || '/General',
           metadata: file.metadata
         }));
         resolve(files);
       };
 
       request.onerror = () => reject(request.error);
+    });
+  }
+
+  /**
+   * Move a file to a different folder
+   * @param {string} fileId - The file ID
+   * @param {string} newFolderPath - The new folder path
+   */
+  async moveFile(fileId, newFolderPath) {
+    await this.initDB();
+
+    const file = await this.getFile(fileId);
+    const oldFolderPath = file.folderPath || '/General';
+
+    // Update file with new folder path
+    file.folderPath = newFolderPath;
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.storeName, this.foldersStoreName], 'readwrite');
+      const filesStore = transaction.objectStore(this.storeName);
+      const foldersStore = transaction.objectStore(this.foldersStoreName);
+
+      // Update file
+      const fileRequest = filesStore.put(file);
+
+      fileRequest.onsuccess = () => {
+        // Update folder counts
+        if (oldFolderPath !== newFolderPath) {
+          // Decrease old folder count
+          const oldFolderRequest = foldersStore.get(oldFolderPath);
+          oldFolderRequest.onsuccess = () => {
+            const oldFolder = oldFolderRequest.result;
+            if (oldFolder && oldFolder.fileCount > 0) {
+              oldFolder.fileCount--;
+              foldersStore.put(oldFolder);
+            }
+          };
+
+          // Increase new folder count
+          const newFolderRequest = foldersStore.get(newFolderPath);
+          newFolderRequest.onsuccess = () => {
+            const newFolder = newFolderRequest.result;
+            if (newFolder) {
+              newFolder.fileCount = (newFolder.fileCount || 0) + 1;
+              foldersStore.put(newFolder);
+            }
+          };
+        }
+
+        resolve();
+      };
+
+      fileRequest.onerror = () => reject(new Error('Failed to move file'));
+    });
+  }
+
+  /**
+   * Delete a folder and optionally move its files
+   * @param {string} folderPath - The folder path to delete
+   * @param {string} moveToFolder - Where to move files (default: '/General')
+   */
+  async deleteFolder(folderPath, moveToFolder = '/General') {
+    await this.initDB();
+
+    // Get all files in the folder
+    const files = await this.listFiles(folderPath);
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.storeName, this.foldersStoreName], 'readwrite');
+      const filesStore = transaction.objectStore(this.storeName);
+      const foldersStore = transaction.objectStore(this.foldersStoreName);
+
+      // Move all files to the new folder
+      const moveFilesPromises = files.map(async (file) => {
+        const fullFile = await this.getFile(file.id);
+        fullFile.folderPath = moveToFolder;
+        return new Promise((fileResolve, fileReject) => {
+          const fileRequest = filesStore.put(fullFile);
+          fileRequest.onsuccess = () => fileResolve();
+          fileRequest.onerror = () => fileReject(new Error('Failed to move file'));
+        });
+      });
+
+      Promise.all(moveFilesPromises).then(() => {
+        // Delete the folder
+        const folderRequest = foldersStore.delete(folderPath);
+
+        folderRequest.onsuccess = () => {
+          // Update destination folder count
+          if (files.length > 0 && moveToFolder !== folderPath) {
+            const destFolderRequest = foldersStore.get(moveToFolder);
+            destFolderRequest.onsuccess = () => {
+              const destFolder = destFolderRequest.result;
+              if (destFolder) {
+                destFolder.fileCount = (destFolder.fileCount || 0) + files.length;
+                foldersStore.put(destFolder);
+              }
+            };
+          }
+
+          resolve();
+        };
+
+        folderRequest.onerror = () => reject(new Error('Failed to delete folder'));
+      }).catch(reject);
     });
   }
 
