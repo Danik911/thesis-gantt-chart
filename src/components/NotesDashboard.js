@@ -616,7 +616,7 @@ const NotesDashboard = () => {
                   </button>
                 </span>
               )}
-              {selectedTags && selectedTags.map(tag => (
+              {Array.isArray(selectedTags) && selectedTags.map(tag => (
                 <span key={tag} className="inline-flex items-center bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full">
                   <FaTag className="mr-1" />
                   {tag}
