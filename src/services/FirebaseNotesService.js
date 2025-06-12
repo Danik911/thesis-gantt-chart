@@ -667,51 +667,109 @@ class FirebaseNotesService {
       }
     };
 
-    // Enhanced error handling with retry logic for connectivity issues
+    // Track active unsubscribe function to prevent multiple listeners
+    let currentUnsubscribe = null;
+    let retryTimeout = null;
     let retryCount = 0;
     const maxRetries = 3;
     const retryDelay = 1000; // Start with 1 second delay
 
     const createListener = () => {
-      return onSnapshot(q, (snapshot) => {
-        const notes = [];
-        snapshot.forEach((doc) => {
-          notes.push({ id: doc.id, ...doc.data() });
-        });
-        console.log(`Real-time listener retrieved ${notes.length} notes`);
-        // Reset retry count on successful connection
-        retryCount = 0;
-        // Client-side filters for search, tags, etc., that are not part of the main query
-        callback(this.applyFilters(notes, filters));
-      }, (error) => {
-        console.error('Error in notes subscription:', error);
-        
-        // Check for specific error types that might indicate connectivity issues
-        if (error.code === 'unavailable' || error.message.includes('QUIC') || error.message.includes('BloomFilter')) {
-          console.warn(`Firebase connectivity issue detected (${error.code}). Attempting fallback...`);
+      // Clean up any existing listener first
+      if (currentUnsubscribe) {
+        console.log('Cleaning up previous listener before creating new one');
+        currentUnsubscribe();
+        currentUnsubscribe = null;
+      }
+
+      // Clear any pending retry timeout
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+        retryTimeout = null;
+      }
+
+      try {
+        currentUnsubscribe = onSnapshot(q, (snapshot) => {
+          const notes = [];
+          snapshot.forEach((doc) => {
+            notes.push({ id: doc.id, ...doc.data() });
+          });
+          console.log(`Real-time listener retrieved ${notes.length} notes`);
+          // Reset retry count on successful connection
+          retryCount = 0;
+          // Client-side filters for search, tags, etc., that are not part of the main query
+          callback(this.applyFilters(notes, filters));
+        }, (error) => {
+          console.error('Error in notes subscription:', error);
           
-          // Try retry with exponential backoff for transient errors
-          if (retryCount < maxRetries) {
-            retryCount++;
-            const delay = retryDelay * Math.pow(2, retryCount - 1);
-            console.log(`Retrying connection in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+          // Clean up current listener on error
+          if (currentUnsubscribe) {
+            currentUnsubscribe();
+            currentUnsubscribe = null;
+          }
+          
+          // Check for specific error types that might indicate connectivity issues
+          if (error.code === 'unavailable' || error.message.includes('QUIC') || error.message.includes('BloomFilter')) {
+            console.warn(`Firebase connectivity issue detected (${error.code}). Attempting fallback...`);
             
-            setTimeout(() => {
-              console.log(`Retry attempt ${retryCount}: Creating new listener`);
-              createListener();
-            }, delay);
+            // Try retry with exponential backoff for transient errors
+            if (retryCount < maxRetries) {
+              retryCount++;
+              const delay = retryDelay * Math.pow(2, retryCount - 1);
+              console.log(`Retrying connection in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+              
+              retryTimeout = setTimeout(() => {
+                console.log(`Retry attempt ${retryCount}: Creating new listener`);
+                createListener();
+              }, delay);
+            } else {
+              console.warn('Max retries reached. Using fallback fetch.');
+              fetchOnce();
+            }
           } else {
-            console.warn('Max retries reached. Using fallback fetch.');
+            // For other errors (like missing index), use immediate fallback
             fetchOnce();
           }
-        } else {
-          // For other errors (like missing index), use immediate fallback
-          fetchOnce();
-        }
-      });
+        });
+
+        // Store listener ID for cleanup tracking
+        const listenerId = `notes_${userId}_${Date.now()}`;
+        this.listeners.set(listenerId, currentUnsubscribe);
+
+        return currentUnsubscribe;
+      } catch (error) {
+        console.error('Error creating listener:', error);
+        fetchOnce();
+        return () => {}; // Return empty function for cleanup
+      }
     };
 
-    return createListener();
+    // Create the initial listener
+    const unsubscribe = createListener();
+
+    // Return cleanup function that properly handles all subscriptions
+    return () => {
+      // Clean up current listener
+      if (currentUnsubscribe) {
+        console.log('Cleaning up notes subscription');
+        currentUnsubscribe();
+        currentUnsubscribe = null;
+      }
+
+      // Clear any pending retry timeout
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+        retryTimeout = null;
+      }
+
+      // Remove from listeners map
+      for (const [id, cleanupFn] of this.listeners.entries()) {
+        if (cleanupFn === currentUnsubscribe || cleanupFn === unsubscribe) {
+          this.listeners.delete(id);
+          break;
+        }
+      }
+    };
   }
 
   /**

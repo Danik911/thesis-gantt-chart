@@ -140,17 +140,24 @@ export const NotesProvider = ({ children }) => {
     if (user?.uid) {
       dispatch({ type: NOTES_ACTIONS.SET_LOADING, payload: true });
 
-      // Notes
+      // Notes - Only subscribe to standalone notes to avoid conflicts with PDF-specific subscriptions
+      // This prevents race conditions with PDFNotesPanel subscriptions
+      const contextFilters = {
+        ...state.filters,
+        type: 'standalone' // Only get standalone notes in the global context
+      };
+
       unsubscribeNotes = firebaseNotesService.subscribeToNotes(
         user.uid,
         (notes, error) => {
           if (error) {
             dispatch({ type: NOTES_ACTIONS.SET_ERROR, payload: error.message });
           } else {
+            console.log(`NotesContext: Received ${notes.length} standalone notes`);
             dispatch({ type: NOTES_ACTIONS.SET_NOTES, payload: notes });
           }
         },
-        state.filters
+        contextFilters
       );
 
       // Folders
@@ -179,6 +186,7 @@ export const NotesProvider = ({ children }) => {
     }
 
     return () => {
+      console.log('NotesContext: Cleaning up subscriptions');
       unsubscribeNotes && unsubscribeNotes();
       unsubscribeFolders && unsubscribeFolders();
       unsubscribeTags && unsubscribeTags();

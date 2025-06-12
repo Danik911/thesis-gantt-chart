@@ -28,14 +28,32 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
   useEffect(() => {
     if (!fileId || !user?.uid) {
       setNotes([]);
+      setLoading(false);
       return;
     }
 
+    console.log(`PDFNotesPanel: Setting up subscription for fileId: ${fileId}`);
     setLoading(true);
+
+    let isActive = true; // Flag to prevent state updates after component unmount
 
     const unsubscribe = firebaseNotesService.subscribeToNotes(
       user.uid,
-      (fileNotes) => {
+      (fileNotes, error) => {
+        // Only update state if component is still active
+        if (!isActive) {
+          console.log('PDFNotesPanel: Ignoring callback for inactive component');
+          return;
+        }
+
+        if (error) {
+          console.error('PDFNotesPanel: Error in notes subscription:', error);
+          setNotes([]);
+          setLoading(false);
+          return;
+        }
+
+        console.log(`PDFNotesPanel: Received ${fileNotes.length} notes for fileId: ${fileId}`);
         setNotes(fileNotes);
         setLoading(false);
       },
@@ -43,7 +61,13 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     );
 
     // Cleanup subscription on component unmount or when fileId changes
-    return () => unsubscribe();
+    return () => {
+      console.log(`PDFNotesPanel: Cleaning up subscription for fileId: ${fileId}`);
+      isActive = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [fileId, user?.uid]);
 
   const handleAddNote = async () => {
