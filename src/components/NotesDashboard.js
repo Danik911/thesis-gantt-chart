@@ -18,10 +18,12 @@ import {
   FaExpand,
   FaCompress
 } from 'react-icons/fa';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import NotesEditor from './NotesEditor';
 import LoginForm from './LoginForm';
 import firebaseNotesService from '../services/FirebaseNotesService';
+import ConfirmationDialog from './ConfirmationDialog';
 
 const NotesDashboard = () => {
   const { user } = useAuth();
@@ -62,6 +64,15 @@ const NotesDashboard = () => {
   // Mobile responsive state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showSidebar, setShowSidebar] = useState(!isMobile);
+
+  // Add new state for tag deletion
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    tagToDelete: null
+  });
+  const [isDeletingTag, setIsDeletingTag] = useState(false);
 
   // Handle window resize
   useEffect(() => {
@@ -228,6 +239,76 @@ const NotesDashboard = () => {
       ? selectedTags.filter(t => t !== tag)
       : [...selectedTags, tag];
     setSelectedTags(newSelectedTags);
+  };
+
+  // Add tag deletion handlers
+  const handleDeleteTag = async (tagName) => {
+    setConfirmationDialog({
+      isOpen: true,
+      title: 'Delete Tag',
+      message: `Are you sure you want to delete the tag "${tagName}"? This will remove it from all notes that use this tag.`,
+      tagToDelete: tagName
+    });
+  };
+
+  const confirmDeleteTag = async () => {
+    const tagName = confirmationDialog.tagToDelete;
+    
+    // Close dialog first
+    setConfirmationDialog({
+      isOpen: false,
+      title: '',
+      message: '',
+      tagToDelete: null
+    });
+
+    if (!tagName) return;
+
+    // Set loading state
+    setIsDeletingTag(true);
+
+    try {
+      // Call the Firebase deletion service
+      await firebaseNotesService.deleteTag(tagName, user.uid);
+      
+      // Update local state immediately for better UX
+      setSelectedTags(prevSelected => prevSelected.filter(tag => tag !== tagName));
+      
+      // Show success notification
+      toast.success(`Tag "${tagName}" has been deleted successfully!`, {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      
+    } catch (error) {
+      console.error('Error deleting tag:', error);
+      
+      // Show error notification
+      toast.error(`Failed to delete tag "${tagName}". Please try again.`, {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } finally {
+      // Clear loading state
+      setIsDeletingTag(false);
+    }
+  };
+
+  const cancelDeleteTag = () => {
+    setConfirmationDialog({
+      isOpen: false,
+      title: '',
+      message: '',
+      tagToDelete: null
+    });
   };
 
   const toggleFolderExpanded = (folderPath) => {
@@ -426,17 +507,37 @@ const NotesDashboard = () => {
             <h3 className="text-sm font-semibold text-gray-700 mb-2">Tags</h3>
             <div className="flex flex-wrap gap-1">
               {tags.map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={() => handleTagClick(tag.name)}
-                  className={`inline-block text-xs px-2 py-1 rounded-full ${
-                    selectedTags.includes(tag.name)
-                      ? 'bg-blue-200 text-blue-800'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {tag.name} ({tag.usageCount || 0})
-                </button>
+                <div key={tag.id} className="flex items-center bg-gray-100 rounded-full">
+                  <button
+                    onClick={() => handleTagClick(tag.name)}
+                    className={`text-xs px-2 py-1 rounded-l-full ${
+                      selectedTags.includes(tag.name)
+                        ? 'bg-blue-200 text-blue-800'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    {tag.name} ({tag.usageCount || 0})
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTag(tag.name);
+                    }}
+                    disabled={isDeletingTag}
+                    className={`px-1 py-1 rounded-r-full transition-colors text-xs ${
+                      isDeletingTag 
+                        ? 'text-gray-400 cursor-not-allowed bg-gray-100' 
+                        : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                    }`}
+                    title={isDeletingTag ? "Deleting..." : "Delete tag"}
+                  >
+                    {isDeletingTag ? (
+                      <div className="w-3 h-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+                    ) : (
+                      <FaTrash className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -644,6 +745,31 @@ const NotesDashboard = () => {
           onClick={() => setShowSidebar(false)}
         />
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmationDialog.isOpen}
+        title={confirmationDialog.title}
+        message={confirmationDialog.message}
+        confirmText="Delete Tag"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteTag}
+        onCancel={cancelDeleteTag}
+      />
+
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 };
