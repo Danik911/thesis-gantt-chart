@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { 
   FaBold, FaItalic, FaUnderline, FaListUl, FaListOl, FaHeading,
   FaCode, FaQuoteLeft, FaUndo, FaRedo, FaSave, FaFileExport,
-  FaMarkdown, FaEye, FaKeyboard, FaTimes, FaExpand, FaCompress
+  FaMarkdown, FaEye, FaKeyboard, FaTimes, FaExpand, FaCompress, FaPlus
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useNotes } from '../contexts/NotesContext';
@@ -341,9 +341,22 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
                     </span>
                   ))}
                   <select
-                    onChange={(e) => {
-                      if (!e.target.value) return;
-                      setSelectedTags([...selectedTags, e.target.value]);
+                    onChange={async (e) => {
+                      const value = e.target.value;
+                      if (!value) return;
+                      if (value === '__create_new__') {
+                        const newTag = prompt('Enter new tag name');
+                        if (newTag && !selectedTags.includes(newTag)) {
+                          try {
+                            await firebaseNotesService.createTagsIfNotExist([newTag], user.uid);
+                            setSelectedTags([...selectedTags, newTag]);
+                          } catch (err) {
+                            toast.error(err.message || 'Failed to create tag');
+                          }
+                        }
+                      } else {
+                        setSelectedTags([...selectedTags, value]);
+                      }
                     }}
                     value=""
                     className="text-xs border border-gray-300 rounded px-2 py-1"
@@ -355,6 +368,7 @@ const NotesEditor = ({ note, onClose, isFullscreen = false, onToggleFullscreen }
                       .map(tagName => (
                         <option key={tagName} value={tagName}>{tagName}</option>
                       ))}
+                    <option value="__create_new__">➕ Create new tag…</option>
                   </select>
                 </div>
               </div>

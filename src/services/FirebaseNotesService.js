@@ -590,15 +590,29 @@ class FirebaseNotesService {
       where('ownerId', '==', userId),
       orderBy('updatedAt', 'desc')
     );
-    
+
+    // Fallback helper: perform one-time fetch if realtime listener fails (e.g., missing index still building)
+    const fetchOnce = async () => {
+      try {
+        const snapshot = await getDocs(notesQuery);
+        const notes = [];
+        snapshot.forEach((doc) => notes.push({ id: doc.id, ...doc.data() }));
+        callback(this.applyFilters(notes, filters));
+      } catch (err) {
+        console.error('Error fetching notes fallback:', err);
+        callback([], err);
+      }
+    };
+
     return onSnapshot(notesQuery, (snapshot) => {
       const notes = [];
       snapshot.forEach((doc) => {
         notes.push({ id: doc.id, ...doc.data() });
       });
-      
-      const filteredNotes = this.applyFilters(notes, filters);
-      callback(filteredNotes);
+      callback(this.applyFilters(notes, filters));
+    }, (error) => {
+      console.error('Error in notes subscription:', error);
+      fetchOnce();
     });
   }
 
@@ -651,7 +665,19 @@ class FirebaseNotesService {
         where('ownerId', '==', userId),
         orderBy('usageCount', 'desc')
       );
-      
+
+      const fetchOnce = async () => {
+        try {
+          const snapshot = await getDocs(tagsQuery);
+          const tags = [];
+          snapshot.forEach((doc) => tags.push({ id: doc.id, ...doc.data() }));
+          callback(tags);
+        } catch (err) {
+          console.error('Error fetching tags fallback:', err);
+          callback([], err);
+        }
+      };
+
       const unsubscribe = onSnapshot(tagsQuery, (snapshot) => {
         const tags = [];
         snapshot.forEach((doc) => {
@@ -660,12 +686,12 @@ class FirebaseNotesService {
         callback(tags);
       }, (error) => {
         console.error('Error in tags subscription:', error);
-        callback([], error);
+        fetchOnce();
       });
-      
+
       const listenerId = `tags_${userId}_${Date.now()}`;
       this.listeners.set(listenerId, unsubscribe);
-      
+
       return () => {
         unsubscribe();
         this.listeners.delete(listenerId);

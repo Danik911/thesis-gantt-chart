@@ -21,6 +21,7 @@ import {
 import { toast } from 'react-toastify';
 import NotesEditor from './NotesEditor';
 import LoginForm from './LoginForm';
+import firebaseNotesService from '../services/FirebaseNotesService';
 
 const NotesDashboard = () => {
   const { user } = useAuth();
@@ -267,7 +268,17 @@ const NotesDashboard = () => {
           )}
           <FaFolder className="mr-2 text-yellow-600" />
           <span className="flex-1">{folder.name}</span>
-          <span className="text-sm text-gray-500">({folder.count})</span>
+          <span className="text-sm text-gray-500 mr-1">({folder.count})</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteFolder(folder.path);
+            }}
+            title="Delete folder"
+            className="text-red-500 hover:text-red-700"
+          >
+            <FaTrash size={12} />
+          </button>
         </div>
         {expandedFolders.has(folder.path) && renderFolderTree(folder.children, level + 1)}
       </div>
@@ -335,6 +346,17 @@ const NotesDashboard = () => {
       </div>
     </div>
   );
+
+  const handleDeleteFolder = async (folderPath) => {
+    if (!window.confirm(`Delete folder "${folderPath}"? All descendant folders will be removed and notes will be moved to /General.`)) return;
+    try {
+      await firebaseNotesService.deleteFolder(folderPath, user.uid);
+      toast.success('Folder deleted');
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to delete folder');
+    }
+  };
 
   if (!user) {
     return (
