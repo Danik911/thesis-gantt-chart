@@ -22,9 +22,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    defaults:
-      run:
-        working-directory: thesis-gantt-chart
     
     environment:
       name: github-pages
@@ -44,8 +41,8 @@ jobs:
       uses: actions/cache@v3
       with:
         path: |
-          thesis-gantt-chart/node_modules
-        key: ${{ runner.os }}-modules-${{ hashFiles('thesis-gantt-chart/package-lock.json') }}
+          **/node_modules
+        key: ${{ runner.os }}-modules-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-modules-
     
@@ -90,7 +87,7 @@ jobs:
       uses: actions/upload-pages-artifact@v3
       with:
         # Upload entire build directory
-        path: './thesis-gantt-chart/build'
+        path: './build'
     
     - name: Deploy to GitHub Pages
       id: deployment
@@ -100,9 +97,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-    defaults:
-      run:
-        working-directory: thesis-gantt-chart
     
     steps:
     - uses: actions/checkout@v4
@@ -117,8 +111,8 @@ jobs:
       uses: actions/cache@v3
       with:
         path: |
-          thesis-gantt-chart/node_modules
-        key: ${{ runner.os }}-modules-${{ hashFiles('thesis-gantt-chart/package-lock.json') }}
+          **/node_modules
+        key: ${{ runner.os }}-modules-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-modules-
     
