@@ -44,7 +44,7 @@ class FileStorageService {
       fileCount: 0
     };
 
-    const folderRef = doc(this.foldersCollection, normalizedPath);
+    const folderRef = this._folderRef(normalizedPath);
     await setDoc(folderRef, folderData, { merge: true });
     return folderData;
   }
@@ -111,7 +111,7 @@ class FileStorageService {
             const docRef = await addDoc(this.filesCollection, fileData);
 
             // Update folder file count
-            const folderRef = doc(this.foldersCollection, folderPath);
+            const folderRef = this._folderRef(folderPath);
             const folderSnap = await getDoc(folderRef);
             if(folderSnap.exists()){
                 const folder = folderSnap.data();
@@ -204,7 +204,7 @@ class FileStorageService {
     // Update folder counts
     if (oldFolderPath !== newFolderPath) {
         // Decrease old folder count
-        const oldFolderRef = doc(this.foldersCollection, oldFolderPath);
+        const oldFolderRef = this._folderRef(oldFolderPath);
         const oldFolderSnap = await getDoc(oldFolderRef);
         if(oldFolderSnap.exists()){
             const oldFolder = oldFolderSnap.data();
@@ -214,7 +214,7 @@ class FileStorageService {
         }
         
         // Increase new folder count
-        const newFolderRef = doc(this.foldersCollection, newFolderPath);
+        const newFolderRef = this._folderRef(newFolderPath);
         const newFolderSnap = await getDoc(newFolderRef);
         if(newFolderSnap.exists()){
             const newFolder = newFolderSnap.data();
@@ -222,7 +222,7 @@ class FileStorageService {
         } else {
             // If new folder doesn't exist, create it
             await this.createFolder(newFolderPath, newFolderPath.split('/').pop());
-            const createdFolderRef = doc(this.foldersCollection, newFolderPath);
+            const createdFolderRef = this._folderRef(newFolderPath);
             await updateDoc(createdFolderRef, {fileCount: 1});
         }
     }
@@ -249,7 +249,7 @@ class FileStorageService {
 
     // Update folder counts
     if (files.length > 0) {
-        const moveToFolderRef = doc(this.foldersCollection, moveToFolder);
+        const moveToFolderRef = this._folderRef(moveToFolder);
         const moveToFolderSnap = await getDoc(moveToFolderRef);
         if(moveToFolderSnap.exists()){
              const moveToFolderData = moveToFolderSnap.data();
@@ -258,7 +258,7 @@ class FileStorageService {
     }
 
     // Delete the folder
-    const folderRef = doc(this.foldersCollection, folderPath);
+    const folderRef = this._folderRef(folderPath);
     await deleteDoc(folderRef);
   }
 
@@ -279,7 +279,7 @@ class FileStorageService {
 
     // Update folder count
     const folderPath = file.folderPath;
-    const folderRef = doc(this.foldersCollection, folderPath);
+    const folderRef = this._folderRef(folderPath);
     const folderSnap = await getDoc(folderRef);
     if(folderSnap.exists()){
         const folder = folderSnap.data();
@@ -384,6 +384,29 @@ class FileStorageService {
             percentage: 100
         });
       }
+  }
+
+  /**
+   * Convert a folderPath string (e.g. "/General" or "/Work/Reports") into a
+   * safe Firestore document ID. Firestore document IDs cannot contain slashes
+   * so we URI‐encode the string and remove the leading slash. This guarantees
+   * we have a single segment path while still being reversible for display.
+   * @param {string} folderPath
+   * @returns {string} Firestore‐safe document ID
+   */
+  _folderPathToId(folderPath) {
+    if (!folderPath) return 'root';
+    // Remove leading slash to avoid empty segment then encode the remainder
+    const sanitized = folderPath.startsWith('/') ? folderPath.slice(1) : folderPath;
+    return encodeURIComponent(sanitized);
+  }
+
+  /**
+   * Helper that returns a DocumentReference for a folder path.
+   * @param {string} folderPath
+   */
+  _folderRef(folderPath) {
+    return doc(this.foldersCollection, this._folderPathToId(folderPath));
   }
 }
 
