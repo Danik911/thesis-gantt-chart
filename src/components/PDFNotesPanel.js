@@ -183,6 +183,16 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     }
   };
 
+  const renderNoteContent = (content) => {
+    if (typeof content === 'string') {
+      return content;
+    }
+    if (content && Array.isArray(content.blocks)) {
+      return content.blocks.map(block => block.text).join('\n');
+    }
+    return '';
+  };
+
   return (
     <div className={`pdf-notes-panel bg-white border-l border-gray-200 ${className}`}>
       {/* Header */}
@@ -416,7 +426,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
                         
                         {note.content && (
                           <p className="text-gray-700 text-sm whitespace-pre-wrap mb-2">
-                            {note.content}
+                            {renderNoteContent(note.content)}
                           </p>
                         )}
 
