@@ -15,6 +15,7 @@ import {
   where, 
   orderBy, 
   limit,
+  startAfter,
   onSnapshot,
   serverTimestamp,
   writeBatch,
@@ -644,13 +645,20 @@ class FirebaseNotesService {
 
     // Always order by last updated
     q = query(q, orderBy('updatedAt', 'desc'));
+    
+    // Add pagination limit to prevent BloomFilter errors with large datasets
+    // This helps avoid "BloomFilter error" when querying many documents
+    const queryLimit = filters.limit || 100; // Default to 100 notes max
+    q = query(q, limit(queryLimit));
 
     // Fallback helper: perform one-time fetch if realtime listener fails
     const fetchOnce = async () => {
       try {
+        console.log('Performing fallback fetch for notes...');
         const snapshot = await getDocs(q);
         const notes = [];
         snapshot.forEach((doc) => notes.push({ id: doc.id, ...doc.data() }));
+        console.log(`Fallback fetch retrieved ${notes.length} notes`);
         // Still apply client-side filters for more complex scenarios
         callback(this.applyFilters(notes, filters));
       } catch (err) {
@@ -659,18 +667,51 @@ class FirebaseNotesService {
       }
     };
 
-    return onSnapshot(q, (snapshot) => {
-      const notes = [];
-      snapshot.forEach((doc) => {
-        notes.push({ id: doc.id, ...doc.data() });
+    // Enhanced error handling with retry logic for connectivity issues
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 1000; // Start with 1 second delay
+
+    const createListener = () => {
+      return onSnapshot(q, (snapshot) => {
+        const notes = [];
+        snapshot.forEach((doc) => {
+          notes.push({ id: doc.id, ...doc.data() });
+        });
+        console.log(`Real-time listener retrieved ${notes.length} notes`);
+        // Reset retry count on successful connection
+        retryCount = 0;
+        // Client-side filters for search, tags, etc., that are not part of the main query
+        callback(this.applyFilters(notes, filters));
+      }, (error) => {
+        console.error('Error in notes subscription:', error);
+        
+        // Check for specific error types that might indicate connectivity issues
+        if (error.code === 'unavailable' || error.message.includes('QUIC') || error.message.includes('BloomFilter')) {
+          console.warn(`Firebase connectivity issue detected (${error.code}). Attempting fallback...`);
+          
+          // Try retry with exponential backoff for transient errors
+          if (retryCount < maxRetries) {
+            retryCount++;
+            const delay = retryDelay * Math.pow(2, retryCount - 1);
+            console.log(`Retrying connection in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+            
+            setTimeout(() => {
+              console.log(`Retry attempt ${retryCount}: Creating new listener`);
+              createListener();
+            }, delay);
+          } else {
+            console.warn('Max retries reached. Using fallback fetch.');
+            fetchOnce();
+          }
+        } else {
+          // For other errors (like missing index), use immediate fallback
+          fetchOnce();
+        }
       });
-       // Client-side filters for search, tags, etc., that are not part of the main query
-      callback(this.applyFilters(notes, filters));
-    }, (error) => {
-      console.error('Error in notes subscription:', error);
-      // Attempt to fetch once if the listener fails (e.g., missing index)
-      fetchOnce();
-    });
+    };
+
+    return createListener();
   }
 
   /**
