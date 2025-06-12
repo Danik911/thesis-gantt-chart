@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import unifiedNotesService from '../services/UnifiedNotesService';
+import { useAssociations } from '../contexts/AssociationContext';
 
 const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = '' }) => {
   const [notes, setNotes] = useState([]);
@@ -13,6 +14,9 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     content: '',
     tags: []
   });
+
+  // Association context
+  const { createAssociation, removeAssociationByNoteId } = useAssociations();
 
   const noteTypes = [
     { value: 'abstract', label: 'Abstract', icon: '📄', color: 'bg-blue-100 text-blue-800' },
@@ -56,6 +60,15 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
       };
 
       const addedNote = await unifiedNotesService.createNote(noteData);
+      // Create association for cross-component syncing
+      try {
+        await createAssociation(addedNote.id, fileId, {
+          pdfName: fileName,
+          noteTitle: addedNote.title
+        });
+      } catch (assocErr) {
+        console.warn('Association creation failed or already exists:', assocErr.message);
+      }
       setNotes(prev => [addedNote, ...prev]);
       setNewNote({ noteType: 'pdf-note', type: 'general', title: '', content: '', tags: [] });
       setShowAddForm(false);
@@ -94,6 +107,13 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     }
 
     try {
+      // Remove association first (if any)
+      try {
+        await removeAssociationByNoteId(noteId);
+      } catch (assocErr) {
+        console.warn('Failed to remove association (maybe none):', assocErr.message);
+      }
+
       await unifiedNotesService.deleteNote(noteId);
       setNotes(prev => prev.filter(note => note.id !== noteId));
       

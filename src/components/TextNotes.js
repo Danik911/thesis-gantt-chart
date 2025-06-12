@@ -30,6 +30,7 @@ const TextNotes = () => {
   const [newFolder, setNewFolder] = useState('');
   const [showNotesList, setShowNotesList] = useState(true);
   const [availableFiles, setAvailableFiles] = useState([]);
+  const [selectedPdfFilter, setSelectedPdfFilter] = useState(null);
   const [selectedFileForAssociation, setSelectedFileForAssociation] = useState(null);
   const [associatedPdf, setAssociatedPdf] = useState(null);
   
@@ -82,8 +83,9 @@ const TextNotes = () => {
 
   const loadNotes = async () => {
     try {
-      const standaloneNotes = await unifiedNotesService.getStandaloneNotes();
-      setNotes(standaloneNotes);
+      // Load ALL notes so we can filter by source later
+      const allNotes = await unifiedNotesService.getNotes();
+      setNotes(allNotes);
     } catch (error) {
       console.error('Error loading notes:', error);
     }
@@ -136,7 +138,7 @@ const TextNotes = () => {
         folder: selectedFolder,
         characterCount,
         wordCount,
-        type: 'standalone',
+        type: selectedFileForAssociation ? 'file-associated' : 'standalone',
         noteType: 'text',
         fileId: selectedFileForAssociation,
         fileName: selectedFileForAssociation ? availableFiles.find(f => f.id === selectedFileForAssociation)?.name : null,
@@ -217,6 +219,13 @@ const TextNotes = () => {
 
     try {
       await removeAssociationByNoteId(currentNote.id);
+      // Also update the note itself to remove the file association flag
+      try {
+        await unifiedNotesService.unassociateNoteFromFile(currentNote.id);
+        await loadNotes();
+      } catch (e) {
+        console.error('Failed to unassociate note from file:', e);
+      }
       setAssociatedPdf(null);
       toast.success('PDF association removed');
     } catch (error) {
@@ -315,6 +324,7 @@ const TextNotes = () => {
   const clearAllFilters = () => {
     setSelectedTags([]);
     setSearchQuery('');
+    setSelectedPdfFilter(null);
   };
 
   // NEW: Remove a specific applied filter
@@ -480,9 +490,12 @@ const TextNotes = () => {
       const matchesTags = selectedTags.length === 0 || 
         selectedTags.every(tag => note.tags?.includes(tag));
       
-      return matchesSearch && matchesTags;
+      // NEW: filter by selected PDF source
+      const matchesSource = selectedPdfFilter ? note.fileId === selectedPdfFilter : true;
+      
+      return matchesSearch && matchesTags && matchesSource;
     });
-  }, [notes, searchQuery, selectedTags]);
+  }, [notes, searchQuery, selectedTags, selectedPdfFilter]);
 
   const toggleMarkdownMode = () => {
     if (isMarkdownMode) {
@@ -529,8 +542,23 @@ const TextNotes = () => {
             className="w-full p-2 border border-gray-300 rounded-lg mb-4"
           />
 
+          {/* PDF Source Filter */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Filter by Source (PDF):</label>
+            <select
+              value={selectedPdfFilter || ''}
+              onChange={(e) => setSelectedPdfFilter(e.target.value || null)}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">All Sources</option>
+              {availableFiles.map(file => (
+                <option key={file.id} value={file.id}>{file.name}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Active Filters Display with Delete Options */}
-          {(selectedTags.length > 0 || searchQuery) && (
+          {(selectedTags.length > 0 || searchQuery || selectedPdfFilter) && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-blue-800">Active Filters:</span>
@@ -553,6 +581,22 @@ const TextNotes = () => {
                     onClick={() => setSearchQuery('')}
                     className="text-red-500 hover:text-red-700 text-xs"
                     title="Remove search filter"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              
+              {/* Source filter */}
+              {selectedPdfFilter && (
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                    Source: {availableFiles.find(f => f.id === selectedPdfFilter)?.name || 'Unknown'}
+                  </span>
+                  <button
+                    onClick={() => setSelectedPdfFilter(null)}
+                    className="text-red-500 hover:text-red-700 text-xs"
+                    title="Remove source filter"
                   >
                     ✕
                   </button>
