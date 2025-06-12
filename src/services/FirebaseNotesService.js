@@ -175,7 +175,31 @@ class FirebaseNotesService {
       const noteSnap = await getDoc(noteRef);
       
       if (!noteSnap.exists()) {
-        throw new Error("Note not found, can't update.");
+        // Note doesn't exist in Firestore - this could be a synchronization issue
+        // Instead of failing, try to create the note with the updates
+        console.warn('updateNote: Note not found in Firestore, attempting to create it');
+        
+        // Create a new note with the provided data
+        const noteData = {
+          id: noteId,
+          title: updates.title || 'Untitled Note',
+          content: updates.content || '',
+          htmlContent: updates.htmlContent || '',
+          markdownContent: updates.markdownContent || '',
+          folderPath: updates.folderPath || '/General',
+          tags: updates.tags || [],
+          fileId: updates.fileId || null,
+          fileName: updates.fileName || null,
+          fileType: updates.fileType || null,
+          ownerId: userId,
+          type: updates.type || 'standalone',
+          noteType: updates.noteType || 'text',
+          characterCount: updates.characterCount || 0,
+          wordCount: updates.wordCount || 0,
+          ...updates
+        };
+        
+        return await this.createNote(noteData, userId);
       }
       
       const currentNote = noteSnap.data();
