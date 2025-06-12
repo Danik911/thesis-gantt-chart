@@ -119,6 +119,9 @@ const TextNotes = () => {
     }
   };
 
+  // Determines the type of note when saving (text vs pdf-note)
+  const determineNoteType = () => (selectedFileForAssociation ? 'pdf-note' : 'text');
+
   // Move saveCurrentNote function declaration before useEffect that uses it
   const saveCurrentNote = useCallback(async () => {
     if (!noteTitle.trim()) return;
@@ -139,7 +142,7 @@ const TextNotes = () => {
         characterCount,
         wordCount,
         type: selectedFileForAssociation ? 'file-associated' : 'standalone',
-        noteType: 'text',
+        noteType: determineNoteType(),
         fileId: selectedFileForAssociation,
         fileName: selectedFileForAssociation ? availableFiles.find(f => f.id === selectedFileForAssociation)?.name : null,
         fileType: selectedFileForAssociation ? availableFiles.find(f => f.id === selectedFileForAssociation)?.type : null
@@ -262,14 +265,19 @@ const TextNotes = () => {
       setAssociatedPdf(null);
     }
     
-    if (note.content) {
-      try {
-        const contentState = convertFromRaw(note.content);
+    // Load content depending on noteType
+    if (note.noteType === 'text' && note.content && typeof note.content === 'object') {
+      const contentState = safeConvertFromRaw(note.content);
+      if (contentState) {
         setEditorState(EditorState.createWithContent(contentState));
-      } catch (error) {
-        console.error('Error loading note content:', error);
+      } else {
         setEditorState(EditorState.createEmpty());
       }
+    } else {
+      // For non-text notes, display plain content in markdown mode for read-only viewing
+      setIsMarkdownMode(true);
+      setMarkdownContent(typeof note.content === 'string' ? note.content : '');
+      setEditorState(EditorState.createEmpty());
     }
   };
 
@@ -485,7 +493,8 @@ const TextNotes = () => {
     return notes.filter(note => {
       const matchesSearch = !searchQuery || 
         note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (note.htmlContent && note.htmlContent.toLowerCase().includes(searchQuery.toLowerCase()));
+        (note.htmlContent && note.htmlContent.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (typeof note.content === 'string' && note.content.toLowerCase().includes(searchQuery.toLowerCase()));
       
       const matchesTags = selectedTags.length === 0 || 
         selectedTags.every(tag => note.tags?.includes(tag));
@@ -510,6 +519,15 @@ const TextNotes = () => {
     }
     setIsMarkdownMode(!isMarkdownMode);
   };
+
+  // Helper: safely parse DraftJS raw content – returns null if fails (hoisted function)
+  function safeConvertFromRaw(raw) {
+    try {
+      return convertFromRaw(raw);
+    } catch (e) {
+      return null;
+    }
+  }
 
   return (
     <div className="container mx-auto p-4 h-screen flex">
