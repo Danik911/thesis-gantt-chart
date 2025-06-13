@@ -128,18 +128,41 @@ const PDFManager = ({
     }
   }, [selectedFile]);
 
+  const getFileObject = async (file) => {
+    // If the file object is a mock from storage, fetch the actual blob
+    if (file.downloadURL && !file.arrayBuffer) {
+      try {
+        const response = await fetch(file.downloadURL);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const blob = await response.blob();
+        // Create a new File object that can be used by the viewers
+        return new File([blob], file.name, { type: file.type, lastModified: new Date(file.uploadedAt).getTime() });
+      } catch (error) {
+        console.error('Error fetching file from storage:', error);
+        // Fallback to the original mock file, though it may fail downstream
+        return file; 
+      }
+    }
+    // If it's a local file or already a valid File object, return it
+    return file;
+  };
+
   const handleFileSelect = async (file) => {
-    setSelectedPdfFile(file);
+    const fileObject = await getFileObject(file);
+    
+    setSelectedPdfFile(fileObject);
     setShowViewer(true);
     
     if (onFileSelect) {
-      onFileSelect(file);
+      onFileSelect(fileObject);
     }
 
     // Process PDF if not already processed
-    const fileKey = `${file.name}_${file.size}`;
+    const fileKey = `${fileObject.name}_${fileObject.size}`;
     if (!processedPdfs.has(fileKey)) {
-      await processPdfFile(file);
+      await processPdfFile(fileObject);
     }
   };
 
@@ -225,7 +248,16 @@ const PDFManager = ({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } else {
-        await fileStorageService.downloadFile(file.storedId);
+        // Use the new getFileObject to ensure we have a valid blob
+        const fileToDownload = await getFileObject(file);
+        const url = URL.createObjectURL(fileToDownload);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileToDownload.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       }
     } catch (error) {
       console.error('Error downloading file:', error);
