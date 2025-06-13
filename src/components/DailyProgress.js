@@ -229,9 +229,14 @@ const DailyProgress = () => {
     if (!user) return;
     
     try {
+      const content = prompt("Enter your quick note:");
+      if (!content) {
+        return; // User cancelled or entered nothing
+      }
+
       const noteData = {
         title: `Daily Note - ${selectedDate.toLocaleDateString()}`,
-        content: '',
+        content: content,
         folderPath: '/Daily Progress',
         tags: ['daily-progress'],
         type: 'standalone',

@@ -379,15 +379,8 @@ const PDFManager = ({
               fileId={selectedPdfFile.storedId || selectedPdfFile.name}
               fileName={selectedPdfFile.name}
               onClose={() => setShowNotesPanel(false)}
-              onNotesChanged={async () => {
-                // Refresh notes count for this file
-                try {
-                  const { data: notes, error } = await firestoreService.readAll('notes', { where: { field: 'fileId', operator: '==', value: selectedPdfFile.storedId || selectedPdfFile.name } });
-                  if (error) throw new Error(error);
-                  setNotesCount(prev => new Map(prev).set(selectedPdfFile.storedId || selectedPdfFile.name, notes.length));
-                } catch (error) {
-                  console.error('Error updating notes count:', error);
-                }
+              onNotesChanged={(count) => {
+                setNotesCount(prev => new Map(prev).set(selectedPdfFile.storedId || selectedPdfFile.name, count));
               }}
               className="w-80 h-full flex flex-col"
             />

@@ -9,7 +9,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
   const [editingNote, setEditingNote] = useState(null);
   const [newNote, setNewNote] = useState({
     noteType: 'pdf-note',
-    type: 'general',
+    category: 'general',
     title: '',
     content: '',
     tags: []
@@ -55,6 +55,9 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
 
         console.log(`PDFNotesPanel: Received ${fileNotes.length} notes for fileId: ${fileId}`);
         setNotes(fileNotes);
+        if (onNotesChanged) {
+          onNotesChanged(fileNotes.length);
+        }
         setLoading(false);
       },
       { fileId: fileId, type: 'file-associated' }
@@ -80,6 +83,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
         ...newNote,
         type: 'file-associated',
         noteType: 'pdf-note',
+        category: newNote.category,
         fileId: fileId,
         fileName: fileName,
         fileType: 'pdf',
@@ -89,12 +93,15 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
       const addedNote = await firebaseNotesService.createNote(noteData, user.uid);
       
       // The real-time listener will automatically update the notes state.
-      setNewNote({ noteType: 'pdf-note', type: 'general', title: '', content: '', tags: [] });
+      setNewNote({ noteType: 'pdf-note', category: 'general', title: '', content: '', tags: [] });
       setShowAddForm(false);
       
+      // onNotesChanged is now handled by the listener
+      /*
       if (onNotesChanged) {
         onNotesChanged();
       }
+      */
 
     } catch (error) {
       console.error('Error adding note:', error);
@@ -108,9 +115,12 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
       // Real-time listener handles the update.
       setEditingNote(null);
       
+      // onNotesChanged is now handled by the listener
+      /*
       if (onNotesChanged) {
         onNotesChanged();
       }
+      */
     } catch (error) {
       console.error('Error updating note:', error);
       alert('Failed to update note. Please try again.');
@@ -125,9 +135,12 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     try {
       await firebaseNotesService.deleteNote(noteId, user.uid);
       // Real-time listener handles the deletion.
+      // onNotesChanged is now handled by the listener
+      /*
       if (onNotesChanged) {
         onNotesChanged();
       }
+      */
     } catch (error) {
       console.error('Error deleting note:', error);
       alert('Failed to delete note. Please try again.');
@@ -145,8 +158,8 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
     });
   };
 
-  const getTypeInfo = (type) => {
-    return noteTypes.find(t => t.value === type) || noteTypes[3];
+  const getTypeInfo = (category) => {
+    return noteTypes.find(t => t.value === category) || noteTypes[3];
   };
 
   const handleTagInput = (value, isNewNote = true) => {
@@ -196,9 +209,12 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
         fileType: null,
       }, user.uid);
       
+      // onNotesChanged is now handled by the listener
+      /*
       if (onNotesChanged) {
         onNotesChanged();
       }
+      */
       
       alert('Note converted to standalone successfully!');
     } catch (error) {
@@ -271,8 +287,8 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
                   Type
                 </label>
                 <select
-                  value={newNote.type}
-                  onChange={(e) => setNewNote(prev => ({ ...prev, type: e.target.value }))}
+                  value={newNote.category}
+                  onChange={(e) => setNewNote(prev => ({ ...prev, category: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   {noteTypes.map(type => (
@@ -332,7 +348,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
                 <button
                   onClick={() => {
                     setShowAddForm(false);
-                    setNewNote({ noteType: 'pdf-note', type: 'general', title: '', content: '', tags: [] });
+                    setNewNote({ noteType: 'pdf-note', category: 'general', title: '', content: '', tags: [] });
                   }}
                   className="px-3 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-colors"
                 >
@@ -359,7 +375,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
           ) : (
             <div className="space-y-4">
               {notes.map(note => {
-                const typeInfo = getTypeInfo(note.type);
+                const typeInfo = getTypeInfo(note.category);
                 const isEditing = editingNote?.id === note.id;
 
                 return (
@@ -429,7 +445,7 @@ const PDFNotesPanel = ({ fileId, fileName, onClose, onNotesChanged, className = 
 
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleUpdateNote(note.id, { title: editingNote.title, content: editingNote.content })}
+                            onClick={() => handleUpdateNote(note.id, { title: editingNote.title, content: editingNote.content, category: editingNote.category })}
                             className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
                           >
                             Save

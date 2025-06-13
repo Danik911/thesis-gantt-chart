@@ -141,6 +141,7 @@ class FirebaseNotesService {
       ownerId: userId,
       type: noteData.type || 'standalone',
       noteType: noteData.noteType || 'text',
+      category: noteData.category || 'general',
       characterCount: noteData.characterCount || 0,
       wordCount: noteData.wordCount || 0,
       createdAt: now,
@@ -195,6 +196,7 @@ class FirebaseNotesService {
           ownerId: userId,
           type: updates.type || 'standalone',
           noteType: updates.noteType || 'text',
+          category: updates.category || 'general',
           characterCount: updates.characterCount || 0,
           wordCount: updates.wordCount || 0,
           ...updates
