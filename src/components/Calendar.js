@@ -31,10 +31,11 @@ const Calendar = ({
       if (onDateSelect) {
         onDateSelect(clickedDate);
       }
+      // Don't change the view when selecting a date - stay in current view
     }
   }, [onDateSelect, validRange.start, validRange.end]);
 
-  // Handle view changes
+  // Handle view changes - FIXED to prevent unwanted view changes
   const handleViewChange = useCallback((view) => {
     setCurrentView(view);
   }, []);
@@ -44,11 +45,17 @@ const Calendar = ({
     const today = new Date();
     if (today >= validRange.start && today < validRange.end) {
       setCurrentDate(today);
+      if (onDateSelect) {
+        onDateSelect(today);
+      }
     } else {
       // If today is outside range, go to the start of the range
       setCurrentDate(validRange.start);
+      if (onDateSelect) {
+        onDateSelect(validRange.start);
+      }
     }
-  }, [validRange.start, validRange.end]);
+  }, [validRange.start, validRange.end, onDateSelect]);
 
   // Create events for days with entries
   const events = daysWithEntries.map(date => ({

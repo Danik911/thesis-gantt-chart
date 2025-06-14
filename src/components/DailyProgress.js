@@ -160,14 +160,17 @@ const DailyProgress = () => {
   useEffect(() => {
     const updatedDays = getDaysWithEntries();
     setDaysWithEntries(updatedDays);
-  }, [tasks, selectedDate]); // Added selectedDate to dependencies
+  }, [tasks]); // Removed selectedDate dependency to avoid infinite loops
 
   // Save tasks to localStorage whenever tasks change - IMPROVED VERSION
   useEffect(() => {
-    if (tasks.length > 0 || localStorage.getItem(`daily-tasks-${selectedDate.toISOString().split('T')[0]}`)) {
+    if (tasks.length > 0) {
       const dateString = selectedDate.toISOString().split('T')[0];
       try {
         localStorage.setItem(`daily-tasks-${dateString}`, JSON.stringify(tasks));
+        // Update days with entries after saving
+        const updatedDays = getDaysWithEntries();
+        setDaysWithEntries(updatedDays);
       } catch (err) {
         setError('Failed to save daily tasks');
         console.error('Error saving tasks:', err);
@@ -177,7 +180,11 @@ const DailyProgress = () => {
 
   // Handle calendar date selection - FIXED VERSION
   const handleDateSelect = (date) => {
-    setSelectedDate(new Date(date)); // Ensure we create a new Date object
+    console.log('Date selected:', date);
+    const newDate = new Date(date);
+    setSelectedDate(newDate);
+    // Force reload tasks for the new date
+    loadTasksForDate(newDate);
   };
 
   const addTask = () => {
@@ -335,7 +342,11 @@ const DailyProgress = () => {
           </div>
           {!isToday && (
             <button
-              onClick={() => setSelectedDate(new Date())}
+              onClick={() => {
+                const today = new Date();
+                setSelectedDate(today);
+                loadTasksForDate(today);
+              }}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
             >
               Go to Today
