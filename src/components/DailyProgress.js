@@ -96,13 +96,14 @@ const DailyProgress = () => {
     loadFilesForDate(selectedDate);
   }, [selectedDate, user]);
 
-  // Get all days with entries from localStorage
+  // Get all days with entries from localStorage - FIXED VERSION
   const getDaysWithEntries = () => {
     const daysWithData = [];
     
-    // Check the June 1 - September 1 range
-    const startDate = new Date(new Date().getFullYear(), 5, 1); // June 1
-    const endDate = new Date(new Date().getFullYear(), 8, 1);   // September 1
+    // Check the June 1 - September 1 range for the current year
+    const currentYear = new Date().getFullYear();
+    const startDate = new Date(currentYear, 5, 1); // June 1
+    const endDate = new Date(currentYear, 8, 1);   // September 1
     
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
@@ -113,11 +114,12 @@ const DailyProgress = () => {
       if (savedTasks) {
         try {
           const tasks = JSON.parse(savedTasks);
-          if (tasks && tasks.length > 0) {
+          if (tasks && Array.isArray(tasks) && tasks.length > 0) {
             daysWithData.push(dateString);
           }
         } catch (err) {
           // Ignore parsing errors for individual days
+          console.warn(`Error parsing tasks for ${dateString}:`, err);
         }
       }
       
@@ -127,14 +129,15 @@ const DailyProgress = () => {
     return daysWithData;
   };
 
-  // Load tasks for a specific date
+  // Load tasks for a specific date - IMPROVED VERSION
   const loadTasksForDate = (date) => {
     setLoading(true);
     try {
       const dateString = date.toISOString().split('T')[0];
       const savedTasks = localStorage.getItem(`daily-tasks-${dateString}`);
       if (savedTasks) {
-        setTasks(JSON.parse(savedTasks));
+        const parsedTasks = JSON.parse(savedTasks);
+        setTasks(Array.isArray(parsedTasks) ? parsedTasks : []);
       } else {
         setTasks([]);
       }
@@ -148,31 +151,33 @@ const DailyProgress = () => {
     }
   };
 
-  // Load tasks from localStorage on component mount and when date changes
+  // Load tasks from localStorage on component mount and when date changes - FIXED
   useEffect(() => {
     loadTasksForDate(selectedDate);
   }, [selectedDate]);
 
-  // Update days with entries when tasks change
+  // Update days with entries when tasks change - FIXED VERSION
   useEffect(() => {
     const updatedDays = getDaysWithEntries();
     setDaysWithEntries(updatedDays);
-  }, [tasks]);
+  }, [tasks, selectedDate]); // Added selectedDate to dependencies
 
-  // Save tasks to localStorage whenever tasks change
+  // Save tasks to localStorage whenever tasks change - IMPROVED VERSION
   useEffect(() => {
-    const dateString = selectedDate.toISOString().split('T')[0];
-    try {
-      localStorage.setItem(`daily-tasks-${dateString}`, JSON.stringify(tasks));
-    } catch (err) {
-      setError('Failed to save daily tasks');
-      console.error('Error saving tasks:', err);
+    if (tasks.length > 0 || localStorage.getItem(`daily-tasks-${selectedDate.toISOString().split('T')[0]}`)) {
+      const dateString = selectedDate.toISOString().split('T')[0];
+      try {
+        localStorage.setItem(`daily-tasks-${dateString}`, JSON.stringify(tasks));
+      } catch (err) {
+        setError('Failed to save daily tasks');
+        console.error('Error saving tasks:', err);
+      }
     }
   }, [tasks, selectedDate]);
 
-  // Handle calendar date selection
+  // Handle calendar date selection - FIXED VERSION
   const handleDateSelect = (date) => {
-    setSelectedDate(date);
+    setSelectedDate(new Date(date)); // Ensure we create a new Date object
   };
 
   const addTask = () => {
@@ -253,8 +258,8 @@ const DailyProgress = () => {
   const completedTasks = tasks.filter(task => task.completed);
   const pendingTasks = tasks.filter(task => !task.completed);
 
-  // Check if selected date is today
-  const isToday = selectedDate.toDateString() === new Date().toDateString();
+  // Check if selected date is today - FIXED
+  const isToday = isSameDay(selectedDate, new Date());
   const isSelectedDateInPast = selectedDate < new Date().setHours(0, 0, 0, 0);
 
   // Format date for display
@@ -312,7 +317,7 @@ const DailyProgress = () => {
         />
       </div>
 
-      {/* Selected Date Header */}
+      {/* Selected Date Header - FIXED */}
       <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <div className="flex items-center justify-between">
           <div>
@@ -345,7 +350,7 @@ const DailyProgress = () => {
           {[
             { key: 'all', label: 'All Items', icon: FaEye, count: summaryData.totalItems },
             { key: 'tasks', label: 'Tasks', icon: FaTasks, count: summaryData.totalTasks },
-                         { key: 'notes', label: 'Notes', icon: FaStickyNote, count: summaryData.totalNotes },
+            { key: 'notes', label: 'Notes', icon: FaStickyNote, count: summaryData.totalNotes },
             { key: 'files', label: 'Files', icon: FaFile, count: summaryData.totalFiles }
           ].map(tab => (
             <button
@@ -365,7 +370,7 @@ const DailyProgress = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="mb-6 flex flex-wrap gap-3">
+      <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="flex gap-2 flex-1 min-w-0">
           <input
             type="text"
@@ -394,18 +399,18 @@ const DailyProgress = () => {
         </div>
         
         {user && (
-                     <button
-             onClick={createQuickNote}
-             className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center"
-           >
-             <FaStickyNote className="mr-2" />
-             Quick Note
-           </button>
+          <button
+            onClick={createQuickNote}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center"
+          >
+            <FaStickyNote className="mr-2" />
+            Quick Note
+          </button>
         )}
       </div>
 
       {/* Progress Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
           <div className="flex items-center">
             <FaTasks className="text-blue-600 mr-3" />
@@ -415,15 +420,15 @@ const DailyProgress = () => {
             </div>
           </div>
         </div>
-                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-           <div className="flex items-center">
-             <FaStickyNote className="text-green-600 mr-3" />
-             <div>
-               <h3 className="font-semibold text-green-800">Notes</h3>
-               <p className="text-2xl font-bold text-green-600">{summaryData.totalNotes}</p>
-             </div>
-           </div>
-         </div>
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <div className="flex items-center">
+            <FaStickyNote className="text-green-600 mr-3" />
+            <div>
+              <h3 className="font-semibold text-green-800">Notes</h3>
+              <p className="text-2xl font-bold text-green-600">{summaryData.totalNotes}</p>
+            </div>
+          </div>
+        </div>
         <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
           <div className="flex items-center">
             <FaFile className="text-purple-600 mr-3" />
@@ -531,10 +536,10 @@ const DailyProgress = () => {
         {/* Notes Section */}
         {(activeTab === 'all' || activeTab === 'notes') && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-                         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-               <FaStickyNote className="mr-2 text-green-600" />
-               Notes for {selectedDate.toLocaleDateString()}
-             </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+              <FaStickyNote className="mr-2 text-green-600" />
+              Notes for {selectedDate.toLocaleDateString()}
+            </h3>
             
             {notesLoading ? (
               <div className="text-center py-4">
@@ -640,7 +645,7 @@ const DailyProgress = () => {
         </div>
       )}
 
-      {/* Calendar Summary */}
+      {/* Calendar Summary - FIXED */}
       <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <h3 className="font-semibold text-gray-800 mb-2">📊 Period Overview</h3>
         <p className="text-gray-600 text-sm">
